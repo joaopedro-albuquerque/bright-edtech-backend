@@ -19,3 +19,18 @@ class Usuario(UsuarioBase):
     model_config = {
         "from_attributes": True
     }
+
+
+class PastaBase(BaseModel):
+    nome: str
+    user_id: UUID
+    parent_id: UUID | None = None
+
+
+class Pasta(PastaBase):
+    id: UUID
+    criado_em: datetime
+
+    model_config = {
+        "from_attributes": True
+    }

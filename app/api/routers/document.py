@@ -1,32 +1,26 @@
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from uuid import UUID
 
-from app.api.dependencies import get_db
-from app.services import DocumentGenerator
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from app.schemas.user_schema import Pasta, PastaBase
+from app.services.DocumentGeneratorService import DocumentGeneratorService
+from app.api.dependencies import get_document_generator_service
 
 router = APIRouter(prefix="/document", tags=["document"])
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-async def criar_documento(
-    documento: UploadFile = File(...),
-    pasta: str = Form(...),
-    subpasta: str = Form(...),
-    nome_documento: str = Form(...),
-    conn=Depends(get_db),
+async def criar_pastas(pasta: PastaBase, service: DocumentGeneratorService = Depends(get_document_generator_service)
 ):
-    """Recebe documento, nome do novo documento, pasta e subpasta para processamento."""
-    if not documento.filename:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O documento é obrigatório")
+    return service.criar_pasta_service(pasta)
 
-    # TODO: implementar o fluxo de DocumentGenerator
-    # 1. salvar o arquivo no S3
-    # 2. processar com IA
-    # 3. salvar resultado no S3 e no banco
-    # O DocumentGenerator ainda não foi implementado.
-    
-    return {
-        "message": "Documento recebido",
-        "filename": documento.filename,
-        "nome_documento": nome_documento,
-        "folder": pasta,
-        "subfolder": subpasta,
-    }
+
+@router.post("/", status_code=status.HTTP_201_CREATED)
+async def salvar_documento(
+    documento: UploadFile = File(...),
+    pasta_id: UUID = Form(...),
+    user_id: UUID = Form(...),
+    nome_documento: str = Form(...),
+    service: DocumentGeneratorService = Depends(get_document_generator_service)
+):
+    return service.salvar_documento(documento, pasta_id, user_id, nome_documento)
+
+

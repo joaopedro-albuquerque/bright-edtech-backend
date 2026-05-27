@@ -34,3 +34,27 @@ class Pasta(PastaBase):
     model_config = {
         "from_attributes": True
     }
+
+class PastaListagemResponse(BaseModel):
+    id: UUID
+    nome: str
+    criada_em: datetime
+
+    model_config = {"from_attributes": True}
+
+class SubpastaResponse(BaseModel):
+    id: UUID
+    nome: str
+    criada_em: datetime | None = None
+
+class DocumentoResponse(BaseModel):
+    id: UUID
+    nome: str
+    status: str
+
+class PastaConteudoResponse(BaseModel):
+    subpastas: list[SubpastaResponse]
+    arquivos: list[DocumentoResponse]
+    total_arquivos: int
+    pagina_atual: int
+    tem_mais_paginas: bool

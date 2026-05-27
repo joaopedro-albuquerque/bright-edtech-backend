@@ -38,5 +38,17 @@ class DocumentGeneratorService:
             "documento": documento_atualizado,
             "s3_url": f"s3://{self.s3_service.bucket_name}/{chave_s3}"
         }
+
+    # Pastas (wrappers para o repository)
+    def listar_pastas_raiz_por_usuario(self, usuario_id: UUID, limit: int, offset: int) -> list:
+        return self.document_repo.listar_pastas_raiz_por_usuario(usuario_id, limit, offset)
     
-    #alterar modelagem para permitir s3key null no primeiro momento
+    def listar_conteudo_pasta(self, pasta_id: UUID, limit: int, offset: int) -> dict:
+        return self.document_repo.listar_conteudo_pasta(pasta_id, limit, offset)
+
+    def atualizar_pasta_nome(self, pasta_id: UUID, nome: str) -> dict | None:
+        return self.document_repo.atualizar_pasta_nome(pasta_id, nome)
+
+    def deletar_pasta(self, pasta_id: UUID) -> bool:
+        return self.document_repo.deletar_pasta(pasta_id)
+    

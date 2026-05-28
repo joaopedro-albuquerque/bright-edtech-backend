@@ -1,11 +1,13 @@
 import os
 import boto3
 import psycopg2
+import psycopg2.extras
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
 # Carrega variáveis locais (ignoradas em ambiente de nuvem nativo)
 load_dotenv()
+psycopg2.extras.register_uuid()
 
 def get_db_connection():
     region = os.getenv("AWS_REGION", "us-east-1")

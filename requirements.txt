@@ -5,3 +5,5 @@ boto3
 python-dotenv
 pydantic[email]
 multipart
+PyPDF2
+google-genai

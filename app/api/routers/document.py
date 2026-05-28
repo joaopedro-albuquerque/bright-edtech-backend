@@ -7,8 +7,8 @@ from app.api.dependencies import get_document_generator_service
 
 router = APIRouter(prefix="/document", tags=["document"])
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
-async def criar_pastas(pasta: PastaBase, service: DocumentGeneratorService = Depends(get_document_generator_service)
+@router.post("/pastas", status_code=status.HTTP_201_CREATED)
+async def criar_pasta(pasta: PastaBase, service: DocumentGeneratorService = Depends(get_document_generator_service)
 ):
     return service.criar_pasta_service(pasta)
 
@@ -21,7 +21,14 @@ def listar_pastas_raiz(
 ) -> list:
     return service.listar_pastas_raiz_por_usuario(user_id, limit, offset)
 
-@router.get("/{pasta_id}/conteudo", response_model=PastaConteudoResponse, status_code=status.HTTP_200_OK)
+@router.get("/pastas/user/{user_id}", response_model=list[PastaListagemResponse], status_code=status.HTTP_200_OK)
+def listar_todas_pastas_usuario(
+    user_id: UUID,
+    service: DocumentGeneratorService = Depends(get_document_generator_service)
+) -> list:
+    return service.listar_todas_pastas_por_usuario(user_id)
+
+@router.get("/pastas/{pasta_id}/conteudo", response_model=PastaConteudoResponse, status_code=status.HTTP_200_OK)
 def listar_conteudo_pasta(
     pasta_id: UUID,
     limit: int = Query(50, ge=1, le=100),  
@@ -45,9 +52,7 @@ def deletar_pasta(pasta_id: UUID, service: DocumentGeneratorService = Depends(ge
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pasta não encontrada")
     return None
 
-
-
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("/documentos/upload", status_code=status.HTTP_201_CREATED)
 async def salvar_documento(
     documento: UploadFile = File(...),
     pasta_id: UUID = Form(...),
@@ -56,3 +61,14 @@ async def salvar_documento(
     service: DocumentGeneratorService = Depends(get_document_generator_service)
 ):
     return service.salvar_documento(documento, pasta_id, user_id, nome_documento)
+
+@router.post("/resumos", status_code=status.HTTP_201_CREATED)
+async def gerar_documento(
+    usuario_id: UUID = Form(...),
+    pasta_id: UUID = Form(...),
+    nome: str = Form(...),
+    arquivo: UploadFile = File(...),
+    service: DocumentGeneratorService = Depends(get_document_generator_service)
+):
+    resultado = service.processar_novo_documento(usuario_id, pasta_id, nome, arquivo)
+    return resultado

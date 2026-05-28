@@ -69,7 +69,7 @@ class DocumentRepository:
         with self.conn.cursor() as cursor:
             query = """
                 SELECT * FROM pastas 
-                WHERE usuario_id = %s AND parent_id IS NULL
+                WHERE user_id = %s AND parent_id IS NULL
                 ORDER BY criada_em DESC
                 LIMIT %s OFFSET %s;
             """
@@ -77,6 +77,18 @@ class DocumentRepository:
             cursor.execute(query, (usuario_id, limit, offset))
             rows = cursor.fetchall()
 
+            return rows
+
+    def listar_todas_pastas_por_usuario(self, usuario_id: UUID) -> list:
+        with self.conn.cursor() as cursor:
+            query = """
+                SELECT id, nome, criada_em
+                FROM pastas
+                WHERE user_id = %s
+                ORDER BY criada_em DESC;
+            """
+            cursor.execute(query, (usuario_id,))
+            rows = cursor.fetchall()
             return rows
     
     def listar_conteudo_pasta(self, pasta_id: UUID, limit: int, offset: int) -> dict:
@@ -93,11 +105,11 @@ class DocumentRepository:
 
             # 2. Buscar documentos com paginação
             query_documentos = """
-                SELECT id, nome, status 
-                FROM documentos 
-                WHERE pasta_id = %s 
-                ORDER BY criado_em DESC 
-                LIMIT %s OFFSET %s;
+            SELECT id, nome, status, resumo  
+            FROM documentos 
+            WHERE pasta_id = %s 
+            ORDER BY criado_em DESC 
+            LIMIT %s OFFSET %s;
             """
             cursor.execute(query_documentos, (pasta_id, limit, offset))
             arquivos = cursor.fetchall()
@@ -141,3 +153,18 @@ class DocumentRepository:
             deleted = cursor.rowcount > 0
             self.conn.commit()
             return deleted
+    
+    def inserir_documento(
+        self, usuario_id: UUID, pasta_id: UUID, nome: str, chave_s3: str, resumo: str
+    ) -> dict:
+        with self.conn.cursor() as cursor:
+            query = """
+                INSERT INTO documentos (usuario_id, pasta_id, nome, chave_s3, nivel_conhecimento, status, resumo)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, nome, status, criado_em;
+            """
+            valores = (usuario_id, pasta_id, nome, chave_s3, 'basico', 'concluido', resumo)
+            cursor.execute(query, valores)
+            self.conn.commit()
+            return cursor.fetchone()
+    

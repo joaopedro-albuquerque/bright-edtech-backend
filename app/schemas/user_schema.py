@@ -51,6 +51,7 @@ class DocumentoResponse(BaseModel):
     id: UUID
     nome: str
     status: str
+    resumo: str | None = None
 
 class PastaConteudoResponse(BaseModel):
     subpastas: list[SubpastaResponse]

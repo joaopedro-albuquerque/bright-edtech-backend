@@ -3,9 +3,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from app.schemas.user_schema import Pasta, PastaBase, PastaConteudoResponse, PastaListagemResponse
 from app.services.DocumentGeneratorService import DocumentGeneratorService
-from app.api.dependencies import get_document_generator_service
+from app.api.dependencies import get_current_user_id, get_document_generator_service
 
-router = APIRouter(prefix="/document", tags=["document"])
+router = APIRouter(tags=["document"])
 
 @router.post("/pastas", status_code=status.HTTP_201_CREATED)
 async def criar_pasta(pasta: PastaBase, service: DocumentGeneratorService = Depends(get_document_generator_service)
@@ -72,3 +72,17 @@ async def gerar_documento(
 ):
     resultado = service.processar_novo_documento(usuario_id, pasta_id, nome, arquivo)
     return resultado
+
+@router.get("documentos/{documento_id}/url-visualizacao", status_code=status.HTTP_200_OK)
+def obter_url_visualizacao(
+    documento_id: UUID,
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: DocumentGeneratorService = Depends(get_document_generator_service)
+) -> dict:
+    try:
+        url = service.gerar_pre_signed_url_visualizacao(documento_id, usuario_id)
+        return {"url": url}
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))

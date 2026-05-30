@@ -28,3 +28,13 @@ class S3Service:
             "key": key,
             "s3_url": f"s3://{self.bucket_name}/{key}"
         }
+
+    def generate_presigned_url(self, key: str, expiration: int = 300) -> str:
+        try:
+            return self.client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.bucket_name, "Key": key},
+                ExpiresIn=expiration
+            )
+        except (BotoCoreError, ClientError) as exc:
+            raise RuntimeError(f"Falha ao gerar URL pré-assinada para S3: {exc}") from exc

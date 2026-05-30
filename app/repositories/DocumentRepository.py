@@ -64,6 +64,17 @@ class DocumentRepository:
 
             self.conn.commit()
             return dict(row)
+
+    def buscar_chave_s3_por_documento_id_e_usuario(self, documento_id: UUID, usuario_id: UUID) -> dict | None:
+        with self.conn.cursor() as cursor:
+            query = """
+                SELECT chave_s3
+                FROM documentos
+                WHERE id = %s AND usuario_id = %s
+                LIMIT 1;
+            """
+            cursor.execute(query, (documento_id, usuario_id))
+            return cursor.fetchone()
         
     def listar_pastas_raiz_por_usuario(self, usuario_id: UUID, limit: int, offset: int) -> list:
         with self.conn.cursor() as cursor:

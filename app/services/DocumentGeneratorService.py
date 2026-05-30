@@ -66,6 +66,18 @@ class DocumentGeneratorService:
         )
         
         return documento_salvo
+    
+    def gerar_pre_signed_url_visualizacao(self, documento_id: UUID, usuario_id: UUID) -> str:
+        documento = self.document_repo.buscar_chave_s3_por_documento_id_e_usuario(
+            documento_id,
+            usuario_id,
+        )
+
+        if not documento or not documento.get("chave_s3"):
+            raise ValueError("Documento não encontrado ou não pertence ao usuário")
+
+        return self.s3_service.generate_presigned_url(documento["chave_s3"])
+
 
     # Pastas (wrappers para o repository)
     def listar_pastas_raiz_por_usuario(self, usuario_id: UUID, limit: int, offset: int) -> list:

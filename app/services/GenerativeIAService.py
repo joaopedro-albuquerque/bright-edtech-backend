@@ -22,7 +22,13 @@ class GenerativeIAService:
         logger.info(f"Texto dividido em {len(chunks)} chunk(s). Iniciando processamento com {self.modelo}...")
 
         for index, chunk in enumerate(chunks):
-            prompt = f"Você é um tutor acadêmico. Faça um resumo estruturado da seguinte parte de um documento:\n{chunk}"
+            prompt = (
+                "Você é um tutor acadêmico experiente. Leia o texto abaixo e entregue um resumo claro, natural e estruturado, "
+                "em português fluente. Use um tom humano, acolhedor e objetivo, como se estivesse explicando para um estudante. "
+                "Inclua uma breve identificação do tema, os pontos principais e um comentário pedagógico sobre a relevância do conteúdo. "
+                "Evite soar mecânico ou repetitivo.\n\n"
+                f"Trecho:\n{chunk}"
+            )
             
             sucesso = False
             tentativas = 0

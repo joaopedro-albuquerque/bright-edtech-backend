@@ -60,6 +60,7 @@ class DocumentGeneratorService:
             return {
                 "message": "Documento salvo com sucesso",
                 "documento": documento_atualizado,
+                "nome_documento": nome_documento,
                 "s3_url": f"s3://{self.s3_service.bucket_name}/{chave_s3}"
             }
         except Exception as e:

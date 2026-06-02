@@ -5,14 +5,20 @@ from app.schemas.user_schema import Pasta, PastaBase, PastaConteudoResponse, Pas
 from app.services.DocumentGeneratorService import DocumentGeneratorService
 from app.api.dependencies import get_current_user_id, get_document_generator_service
 
-router = APIRouter(tags=["document"])
+pastas_router = APIRouter(prefix="/pastas", tags=["pastas"])
+documentos_router = APIRouter(prefix="/documentos", tags=["documentos"])
+resumos_router = APIRouter(prefix="/resumos", tags=["resumos"])
 
-@router.post("/pastas", status_code=status.HTTP_201_CREATED)
-async def criar_pasta(pasta: PastaBase, service: DocumentGeneratorService = Depends(get_document_generator_service)
+
+@pastas_router.post("", status_code=status.HTTP_201_CREATED)
+async def criar_pasta(
+    pasta: PastaBase, 
+    service: DocumentGeneratorService = Depends(get_document_generator_service)
 ):
     return service.criar_pasta_service(pasta)
 
-@router.get("/pastas/user/{user_id}", response_model=list[PastaListagemResponse], status_code=status.HTTP_200_OK)
+
+@pastas_router.get("/user/{user_id}", response_model=list[PastaListagemResponse], status_code=status.HTTP_200_OK)
 def listar_pastas_raiz(
     user_id: UUID, 
     limit: int = Query(50, ge=1, le=100),  
@@ -21,14 +27,16 @@ def listar_pastas_raiz(
 ) -> list:
     return service.listar_pastas_raiz_por_usuario(user_id, limit, offset)
 
-@router.get("/pastas/user/{user_id}/todas", response_model=list[PastaListagemResponse], status_code=status.HTTP_200_OK)
+
+@pastas_router.get("/user/{user_id}/todas", response_model=list[PastaListagemResponse], status_code=status.HTTP_200_OK)
 def listar_todas_pastas_usuario(
     user_id: UUID,
     service: DocumentGeneratorService = Depends(get_document_generator_service)
 ) -> list:
     return service.listar_todas_pastas_por_usuario(user_id)
 
-@router.get("/pastas/{pasta_id}/conteudo", response_model=PastaConteudoResponse, status_code=status.HTTP_200_OK)
+
+@pastas_router.get("/{pasta_id}/conteudo", response_model=PastaConteudoResponse, status_code=status.HTTP_200_OK)
 def listar_conteudo_pasta(
     pasta_id: UUID,
     limit: int = Query(50, ge=1, le=100),  
@@ -37,22 +45,30 @@ def listar_conteudo_pasta(
 ):
     return service.listar_conteudo_pasta(pasta_id, limit, offset)
 
-@router.put("/pastas/{pasta_id}", response_model=Pasta, status_code=status.HTTP_200_OK)
-def atualizar_pasta(pasta_id: UUID, nome: str = Form(...), service: DocumentGeneratorService = Depends(get_document_generator_service)) -> Pasta:
+
+@pastas_router.put("/{pasta_id}", response_model=Pasta, status_code=status.HTTP_200_OK)
+def atualizar_pasta(
+    pasta_id: UUID, 
+    nome: str = Form(...), 
+    service: DocumentGeneratorService = Depends(get_document_generator_service)
+) -> Pasta:
     pasta_atualizada = service.atualizar_pasta_nome(pasta_id, nome)
     if not pasta_atualizada:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pasta não encontrada")
     return pasta_atualizada
 
 
-@router.delete("/pastas/{pasta_id}", status_code=status.HTTP_204_NO_CONTENT)
-def deletar_pasta(pasta_id: UUID, service: DocumentGeneratorService = Depends(get_document_generator_service)) -> None:
+@pastas_router.delete("/{pasta_id}", status_code=status.HTTP_204_NO_CONTENT)
+def deletar_pasta(
+    pasta_id: UUID, 
+    service: DocumentGeneratorService = Depends(get_document_generator_service)
+) -> None:
     deleted = service.deletar_pasta(pasta_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pasta não encontrada")
     return None
 
-@router.post("/documentos/upload", status_code=status.HTTP_201_CREATED)
+@documentos_router.post("/upload", status_code=status.HTTP_201_CREATED)
 def salvar_documento(
     documento: UploadFile = File(...),
     pasta_id: UUID = Form(...),
@@ -62,17 +78,8 @@ def salvar_documento(
 ):
     return service.salvar_documento(documento, pasta_id, user_id, nome_documento)
 
-@router.post("/resumos", status_code=status.HTTP_201_CREATED)
-def gerar_documento(
-    usuario_id: UUID = Form(...),
-    pasta_id: UUID = Form(...),
-    arquivo:  UUID = Form(...),
-    service: DocumentGeneratorService = Depends(get_document_generator_service)
-):
-    resultado = service.processar_novo_documento(usuario_id, pasta_id, arquivo)
-    return resultado
 
-@router.get("/documentos/{documento_id}/url-visualizacao", status_code=status.HTTP_200_OK)
+@documentos_router.get("/{documento_id}/url-visualizacao", status_code=status.HTTP_200_OK)
 def obter_url_visualizacao(
     documento_id: UUID,
     usuario_id: UUID = Depends(get_current_user_id),
@@ -85,8 +92,19 @@ def obter_url_visualizacao(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
-    
-@router.get("/resumos/{arquivo}", status_code=status.HTTP_200_OK)
+
+@resumos_router.post("", status_code=status.HTTP_201_CREATED)
+def gerar_documento(
+    usuario_id: UUID = Form(...),
+    pasta_id: UUID = Form(...),
+    arquivo:  UUID = Form(...),
+    service: DocumentGeneratorService = Depends(get_document_generator_service)
+):
+    resultado = service.processar_novo_documento(usuario_id, pasta_id, arquivo)
+    return resultado
+
+
+@resumos_router.get("/{arquivo}", status_code=status.HTTP_200_OK)
 def buscar_resumo(
     arquivo: UUID,
     usuario_id: UUID = Depends(get_current_user_id),

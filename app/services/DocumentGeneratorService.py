@@ -58,10 +58,13 @@ class DocumentGeneratorService:
 
             logger.info(f"Documento {documento_id} salvo e vinculado com sucesso.")
             return {
-                "message": "Documento salvo com sucesso",
-                "documento": documento_atualizado,
+                "id": documento_atualizado["id"],
                 "nome_documento": nome_documento,
-                "s3_url": f"s3://{self.s3_service.bucket_name}/{chave_s3}"
+                "s3_url": f"s3://{self.s3_service.bucket_name}/{chave_s3}",
+                "status": documento_atualizado.get("status"),
+                "resumo": documento_atualizado.get("resumo"),
+                "chave_s3": documento_atualizado.get("chave_s3"),
+                "documento": documento_atualizado,
             }
         except Exception as e:
             logger.error(f"Falha na esteira de salvamento do documento '{nome_documento}': {str(e)}", exc_info=True)

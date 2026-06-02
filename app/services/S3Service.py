@@ -1,4 +1,5 @@
 import os
+import io
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -38,3 +39,10 @@ class S3Service:
             )
         except (BotoCoreError, ClientError) as exc:
             raise RuntimeError(f"Falha ao gerar URL pré-assinada para S3: {exc}") from exc
+        
+    def download_file(self, key: str) -> io.BytesIO:
+        try:
+            response = self.client.get_object(Bucket=self.bucket_name, Key=key)
+            return io.BytesIO(response['Body'].read())
+        except (BotoCoreError, ClientError) as exc:
+            raise RuntimeError(f"Falha ao baixar arquivo do S3: {exc}") from exc

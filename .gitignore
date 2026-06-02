@@ -69,3 +69,6 @@ htmlcov/
 
 # Generated docs
 docs/_build/
+
+# Deploy
+deploy.ps1

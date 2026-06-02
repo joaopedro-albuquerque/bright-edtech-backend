@@ -15,13 +15,13 @@ async def criar_pasta(pasta: PastaBase, service: DocumentGeneratorService = Depe
 @router.get("/pastas/user/{user_id}", response_model=list[PastaListagemResponse], status_code=status.HTTP_200_OK)
 def listar_pastas_raiz(
     user_id: UUID, 
-    limit: int = 50, 
-    offset: int = 0, 
+    limit: int = Query(50, ge=1, le=100),  
+    offset: int = Query(0, ge=0), 
     service: DocumentGeneratorService = Depends(get_document_generator_service)
 ) -> list:
     return service.listar_pastas_raiz_por_usuario(user_id, limit, offset)
 
-@router.get("/pastas/user/{user_id}", response_model=list[PastaListagemResponse], status_code=status.HTTP_200_OK)
+@router.get("/pastas/user/{user_id}/todas", response_model=list[PastaListagemResponse], status_code=status.HTTP_200_OK)
 def listar_todas_pastas_usuario(
     user_id: UUID,
     service: DocumentGeneratorService = Depends(get_document_generator_service)
@@ -53,7 +53,7 @@ def deletar_pasta(pasta_id: UUID, service: DocumentGeneratorService = Depends(ge
     return None
 
 @router.post("/documentos/upload", status_code=status.HTTP_201_CREATED)
-async def salvar_documento(
+def salvar_documento(
     documento: UploadFile = File(...),
     pasta_id: UUID = Form(...),
     user_id: UUID = Form(...),
@@ -63,17 +63,16 @@ async def salvar_documento(
     return service.salvar_documento(documento, pasta_id, user_id, nome_documento)
 
 @router.post("/resumos", status_code=status.HTTP_201_CREATED)
-async def gerar_documento(
+def gerar_documento(
     usuario_id: UUID = Form(...),
     pasta_id: UUID = Form(...),
-    nome: str = Form(...),
-    arquivo: UploadFile = File(...),
+    arquivo:  UUID = Form(...),
     service: DocumentGeneratorService = Depends(get_document_generator_service)
 ):
-    resultado = service.processar_novo_documento(usuario_id, pasta_id, nome, arquivo)
+    resultado = service.processar_novo_documento(usuario_id, pasta_id, arquivo)
     return resultado
 
-@router.get("documentos/{documento_id}/url-visualizacao", status_code=status.HTTP_200_OK)
+@router.get("/documentos/{documento_id}/url-visualizacao", status_code=status.HTTP_200_OK)
 def obter_url_visualizacao(
     documento_id: UUID,
     usuario_id: UUID = Depends(get_current_user_id),
@@ -86,3 +85,14 @@ def obter_url_visualizacao(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+    
+@router.get("/resumos/{arquivo}", status_code=status.HTTP_200_OK)
+def buscar_resumo(
+    arquivo: UUID,
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: DocumentGeneratorService = Depends(get_document_generator_service)
+):
+    try:
+        return service.buscar_resumo_documento(arquivo, usuario_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))

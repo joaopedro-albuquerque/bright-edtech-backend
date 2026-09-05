@@ -1,0 +1,154 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Stack Cognito Bright EdTech: User Pool, App Client e User Pool Domain'
+
+# ==============================================================================
+# PARAMETERS
+# ==============================================================================
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: 'prod-brightedtech'
+
+  DomainName:
+    Type: String
+    Default: 'brightedtech.com.br'
+
+  AppSubdomain:
+    Type: String
+    Default: 'app'
+    Description: 'Subdomínio do Frontend React (ex: app.brightedtech.com.br)'
+
+  CognitoDomainPrefix:
+    Type: String
+    Default: 'brightedtech-auth'
+    Description: 'Prefixo único para o domínio nativo do Cognito (ex: brightedtech-auth.auth.us-east-1.amazoncognito.com)'
+
+# ==============================================================================
+# RESOURCES
+# ==============================================================================
+Resources:
+
+  # ----------------------------------------------------------------------------
+  # 1. COGNITO USER POOL
+  # ----------------------------------------------------------------------------
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: 'bright-website-users'
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          RequireUppercase: true
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+        - Name: name
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+        - Name: given_name
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+        - Name: family_name
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+
+  # ----------------------------------------------------------------------------
+  # 2. COGNITO USER POOL DOMAIN (Necessário para a Hosted UI / OAuth2)
+  # ----------------------------------------------------------------------------
+  UserPoolDomainResource:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref CognitoDomainPrefix
+      UserPoolId: !Ref UserPool
+
+  # ----------------------------------------------------------------------------
+  # 3. COGNITO APP CLIENT
+  # ----------------------------------------------------------------------------
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: 'bright-website-front-end-application'
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+
+      # Fluxos de Autenticação
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_CUSTOM_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+
+      # Configurações de Validade de Tokens
+      RefreshTokenValidity: 5
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      TokenValidityUnits:
+        RefreshToken: 'days'
+        AccessToken: 'minutes'
+        IdToken: 'minutes'
+
+      # Segurança de Revogação e Erros
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+
+      # Provedores de Identidade e OAuth
+      SupportedIdentityProviders:
+        - COGNITO
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+
+      # Callback URLs apontando para o CloudFront com domínio próprio + Localhost
+      CallbackURLs:
+        - 'http://localhost:5173'
+        - 'http://localhost:5173/'
+        - !Sub 'https://${AppSubdomain}.${DomainName}'
+        - !Sub 'https://${AppSubdomain}.${DomainName}/'
+        - !Sub 'https://${DomainName}'
+        - !Sub 'https://${DomainName}/'
+
+      LogoutURLs:
+        - 'http://localhost:5173'
+        - 'http://localhost:5173/'
+        - !Sub 'https://${AppSubdomain}.${DomainName}'
+        - !Sub 'https://${AppSubdomain}.${DomainName}/'
+        - !Sub 'https://${DomainName}'
+        - !Sub 'https://${DomainName}/'
+
+# ==============================================================================
+# OUTPUTS
+# ==============================================================================
+Outputs:
+  UserPoolId:
+    Description: 'ID do User Pool bright-website-users'
+    Value: !Ref UserPool
+    Export:
+      Name: !Sub '${EnvironmentName}-UserPoolId'
+
+  UserPoolClientId:
+    Description: 'Client ID do bright-website-front-end-application'
+    Value: !Ref UserPoolClient
+    Export:
+      Name: !Sub '${EnvironmentName}-UserPoolClientId'
+
+  CognitoAuthDomain:
+    Description: 'URL do Domínio OAuth2 do Cognito'
+    Value: !Sub 'https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com'
+    Export:
+      Name: !Sub '${EnvironmentName}-CognitoDomain'

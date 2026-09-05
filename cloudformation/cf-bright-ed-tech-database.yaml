@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Banco de Dados RDS PostgreSQL Bright EdTech (Possui Custo de Instância e Storage)'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: 'prod-brightedtech'
+
+  DBUser:
+    Type: String
+    Default: 'dbadmin'
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+
+  DBInstanceClass:
+    Type: String
+    Default: 'db.t3.micro'
+
+Resources:
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: 'Subnets privadas para o RDS'
+      SubnetIds:
+        - !ImportValue
+          'Fn::Sub': '${EnvironmentName}-PrivateSubnet1'
+        - !ImportValue
+          'Fn::Sub': '${EnvironmentName}-PrivateSubnet2'
+
+  PostgreSQLDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: postgres
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: 20
+      DBName: 'brightedtechdb'
+      MasterUsername: !Ref DBUser
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !ImportValue
+          'Fn::Sub': '${EnvironmentName}-RDSSecurityGroup'
+      PubliclyAccessible: false
+      MultiAZ: false
+
+Outputs:
+  DBEndpoint:
+    Value: !GetAtt PostgreSQLDB.Endpoint.Address
+    Export:
+      Name: !Sub '${EnvironmentName}-DBEndpoint'

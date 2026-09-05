@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Explore AWS - Completa as tarefas de EC2, Budget e Lambda em uma única stack.'
+
+Parameters:
+  NotificationEmail:
+    Type: String
+    Default: 'seu-email@exemplo.com'
+    Description: 'E-mail para receber notificações do AWS Budget'
+
+  LatestAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64'
+    Description: 'Busca a AMI mais recente do Amazon Linux 2023 dinamicamente para a regiao atual'
+
+Resources:
+  # ============================================================================
+  # 1. LAUNCH AN INSTANCE USING EC2 ($20)
+  # ============================================================================
+  ExploreEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: !Ref LatestAmiId
+      Tags:
+        - Key: Name
+          Value: explore-aws-ec2-task
+
+  # ============================================================================
+  # 2. SET UP A COST BUDGET USING AWS BUDGETS ($20)
+  # ============================================================================
+  ExploreCostBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: 'ExploreAWS-Monthly-Budget'
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: 10
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref NotificationEmail
+
+  # ============================================================================
+  # 3. CREATE A WEB APP USING AWS LAMBDA ($20)
+  # ============================================================================
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  ExploreLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: 'explore-aws-web-app'
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {
+                  'statusCode': 200,
+                  'body': 'Hello from Explore AWS Web App!'
+              }
+
+  LambdaFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt ExploreLambdaFunction.Arn
+      AuthType: NONE
+
+  LambdaUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ExploreLambdaFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
+# ==============================================================================
+# OUTPUTS
+# ==============================================================================
+Outputs:
+  EC2InstanceId:
+    Description: 'ID da instância EC2 criada'
+    Value: !Ref ExploreEC2Instance
+
+  BudgetName:
+    Description: 'Nome do Orçamento criado'
+    Value: !Ref ExploreCostBudget
+
+  LambdaWebAppURL:
+    Description: 'URL pública da Function URL da Lambda'
+    Value: !GetAtt LambdaFunctionUrl.FunctionUrl

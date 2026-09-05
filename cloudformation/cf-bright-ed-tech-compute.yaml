@@ -115,19 +115,30 @@ Resources:
         - FARGATE
       ExecutionRoleArn: !ImportValue
         'Fn::Sub': '${EnvironmentName}-ECSTaskExecutionRoleArn'
+      TaskRoleArn: !ImportValue
+        'Fn::Sub': '${EnvironmentName}-ECSTaskRoleArn'
       ContainerDefinitions:
         - Name: api-container
           Image: !Ref AppImage
           PortMappings:
             - ContainerPort: !Ref AppContainerPort
               Protocol: tcp
+          Environment:
+            - Name: AWS_REGION
+              Value: us-east-1
+            - Name: DB_HOST
+              Value: prod-brightedtech-postgres-db.cmjuyiy888yf.us-east-1.rds.amazonaws.com
+            - Name: DB_NAME
+              Value: brightedtechdb
+            - Name: S3_BUCKET_NAME
+              Value: prod-brightedtech-client-docs-871341458526
           LogConfiguration:
             LogDriver: awslogs
             Options:
               awslogs-group: !Ref ECSLogGroup
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
-
+              
   AppService:
     Type: AWS::ECS::Service
     DependsOn:

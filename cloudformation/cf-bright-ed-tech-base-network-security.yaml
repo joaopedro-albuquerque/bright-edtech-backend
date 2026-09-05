@@ -139,7 +139,7 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable
 
   # ----------------------------------------------------------------------------
-  # SEGURANÇA & IAM
+  # SEGURANÇA
   # ----------------------------------------------------------------------------
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -178,19 +178,6 @@ Resources:
           ToPort: 5432
           SourceSecurityGroupId: !Ref ECSSecurityGroup
 
-  ECSTaskExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-
   # ----------------------------------------------------------------------------
   # ARMAZENAMENTO PERSISTENTE (Documentos)
   # ----------------------------------------------------------------------------
@@ -208,6 +195,58 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
 
+  # ----------------------------------------------------------------------------
+  # ROLES IAM
+  # ----------------------------------------------------------------------------
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  ECSTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BrightEdTechAppPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Permissões CRUD no S3 Bucket de Documentos
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt DocumentsBucket.Arn
+                  - !Sub '${DocumentsBucket.Arn}/*'
+              # Permissões de Leitura de Parâmetros e Segredos (RDS / App Configs)
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - ssm:GetParameters
+                  - ssm:GetParameter
+                Resource: '*'
+
+# ----------------------------------------------------------------------------
+# OUTPUTS / EXPORTS
+# ----------------------------------------------------------------------------
 Outputs:
   VpcId:
     Value: !Ref MainVPC
@@ -245,3 +284,11 @@ Outputs:
     Value: !GetAtt ECSTaskExecutionRole.Arn
     Export:
       Name: !Sub '${EnvironmentName}-ECSTaskExecutionRoleArn'
+  ECSTaskRoleArn:
+    Value: !GetAtt ECSTaskRole.Arn
+    Export:
+      Name: !Sub '${EnvironmentName}-ECSTaskRoleArn'
+  DocumentsBucketName:
+    Value: !Ref DocumentsBucket
+    Export:
+      Name: !Sub '${EnvironmentName}-DocumentsBucketName'

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Camada de Banco de Dados Bright EdTech: PostgreSQL em RDS com Acesso Publico de Dev'
+Description: 'Camada de Banco de Dados Bright EdTech: PostgreSQL privado em RDS'
 
 Parameters:
   EnvironmentName:
@@ -18,58 +18,40 @@ Parameters:
     Type: String
     NoEcho: true
 
-  AllowedLocation:
-    Type: String
-    Default: '0.0.0.0/0'
-    Description: 'IP permitido para conectar no RDS. Use ex: 189.100.x.x/32 para limitar ao seu IP.'
-
 Resources:
   # ----------------------------------------------------------------------------
-  # REGRA DE ENTRADA NO SECURITY GROUP (LIBERA ACESSO EXTERNO)
+  # SUBNET GROUP PARA O RDS (subnets privadas, sem endereco IP publico)
   # ----------------------------------------------------------------------------
-  RDSIngressRule:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !ImportValue
-        'Fn::Sub': '${EnvironmentName}-RDSSecurityGroup'
-      IpProtocol: tcp
-      FromPort: 5432
-      ToPort: 5432
-      CidrIp: !Ref AllowedLocation
-
-  # ----------------------------------------------------------------------------
-  # SUBNET GROUP PARA O RDS (Subnets Publicas para suportar IP Publico)
-  # ----------------------------------------------------------------------------
-  DBSubnetGroup:
+  PrivateDBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
-      DBSubnetGroupDescription: 'Subnets para a instancia PostgreSQL'
+      DBSubnetGroupDescription: 'Subnets privadas para a instancia PostgreSQL'
       SubnetIds:
         - !ImportValue
-          'Fn::Sub': '${EnvironmentName}-PublicSubnet1'
+          'Fn::Sub': '${EnvironmentName}-PrivateSubnet1'
         - !ImportValue
-          'Fn::Sub': '${EnvironmentName}-PublicSubnet2'
+          'Fn::Sub': '${EnvironmentName}-PrivateSubnet2'
 
   # ----------------------------------------------------------------------------
   # INSTANCIA RDS POSTGRESQL
   # ----------------------------------------------------------------------------
   PostgreSQLDB:
     Type: AWS::RDS::DBInstance
-    DeletionPolicy: Delete
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
     Properties:
       DBInstanceIdentifier: !Sub '${EnvironmentName}-postgres-db'
       AllocatedStorage: '20'
       DBInstanceClass: db.t3.micro
       Engine: postgres
-      EngineVersion: '16'
       DBName: !Ref DBName
       MasterUsername: !Ref DBUser
       MasterUserPassword: !Ref DBPassword
-      PubliclyAccessible: true
+      PubliclyAccessible: false
       VPCSecurityGroups:
         - !ImportValue
           'Fn::Sub': '${EnvironmentName}-RDSSecurityGroup'
-      DBSubnetGroupName: !Ref DBSubnetGroup
+      DBSubnetGroupName: !Ref PrivateDBSubnetGroup
 
 Outputs:
   RDSEndpoint:

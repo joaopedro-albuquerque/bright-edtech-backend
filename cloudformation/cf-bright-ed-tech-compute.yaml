@@ -127,7 +127,7 @@ Resources:
             - Name: AWS_REGION
               Value: us-east-1
             - Name: DB_HOST
-              Value: prod-brightedtech-postgres-db.cmjuyiy888yf.us-east-1.rds.amazonaws.com
+              Value: prod-brightedtech-postgres-private.cmjuyiy888yf.us-east-1.rds.amazonaws.com
             - Name: DB_NAME
               Value: brightedtechdb
             - Name: S3_BUCKET_NAME

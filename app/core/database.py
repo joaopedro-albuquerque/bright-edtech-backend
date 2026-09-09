@@ -1,5 +1,5 @@
 import os
-import boto3
+# import boto3
 import psycopg2
 import psycopg2.extras
 from psycopg2.extras import RealDictCursor
@@ -10,21 +10,23 @@ load_dotenv()
 psycopg2.extras.register_uuid()
 
 def get_db_connection():
-    region = os.getenv("AWS_REGION", "us-east-1")
-    systemManager_client = boto3.client('ssm', region_name=region)
-
-    response = systemManager_client.get_parameters_by_path(
-        Path='/brightedtech/rds/',
-        WithDecryption=True
-    )
-    
-    credenciais = {
-        param['Name'].split('/')[-1]: param['Value'] 
-        for param in response['Parameters']
-    }
-    
-    db_user = credenciais.get('db_user')
-    db_password = credenciais.get('db_password')
+    db_user = "api_brightedtech"
+    db_password = "12zjUcL4V=2=fLeB"
+    # region = os.getenv("AWS_REGION", "us-east-1")
+    # systemManager_client = boto3.client('ssm', region_name=region)
+    #
+    # response = systemManager_client.get_parameters_by_path(
+    #     Path='/brightedtech/rds/',
+    #     WithDecryption=True
+    # )
+    #
+    # credenciais = {
+    #     param['Name'].split('/')[-1]: param['Value']
+    #     for param in response['Parameters']
+    # }
+    #
+    # db_user = credenciais.get('db_user')
+    # db_password = credenciais.get('db_password')
     db_host = os.getenv("DB_HOST", "localhost")
     db_name = os.getenv("DB_NAME", "brightedtech")
     

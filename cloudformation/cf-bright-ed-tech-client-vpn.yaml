@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Acesso temporario ao RDS privado via AWS Client VPN'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: 'prod-brightedtech'
+
+  ServerCertificateArn:
+    Type: String
+    Description: 'ARN do certificado ACM usado pelo endpoint Client VPN'
+
+  ClientRootCertificateChainArn:
+    Type: String
+    Description: 'ARN do certificado ACM que assina os certificados dos clientes'
+
+  ClientCidrBlock:
+    Type: String
+    Default: '10.250.0.0/22'
+    Description: 'CIDR reservado para os clientes conectados ao VPN; nao pode sobrepor a VPC'
+
+Resources:
+  ClientVpnEndpoint:
+    Type: AWS::EC2::ClientVpnEndpoint
+    Properties:
+      Description: !Sub '${EnvironmentName}-client-vpn'
+      VpcId: !ImportValue
+        'Fn::Sub': '${EnvironmentName}-VpcId'
+      ServerCertificateArn: !Ref ServerCertificateArn
+      ClientCidrBlock: !Ref ClientCidrBlock
+      AuthenticationOptions:
+        - Type: certificate-authentication
+          MutualAuthentication:
+            ClientRootCertificateChainArn: !Ref ClientRootCertificateChainArn
+      ConnectionLogOptions:
+        Enabled: false
+      SecurityGroupIds:
+        - !ImportValue
+          'Fn::Sub': '${EnvironmentName}-ECSSecurityGroup'
+      SplitTunnel: true
+      TransportProtocol: udp
+      VpnPort: 443
+      DnsServers:
+        - '10.0.0.2'
+      TagSpecifications:
+        - ResourceType: client-vpn-endpoint
+          Tags:
+            - Key: Name
+              Value: !Sub '${EnvironmentName}-client-vpn'
+
+  PrivateSubnetAssociation:
+    Type: AWS::EC2::ClientVpnTargetNetworkAssociation
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      SubnetId: !ImportValue
+        'Fn::Sub': '${EnvironmentName}-PrivateSubnet1'
+
+  VpcRoute:
+    Type: AWS::EC2::ClientVpnRoute
+    DependsOn: PrivateSubnetAssociation
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      DestinationCidrBlock: '10.0.0.0/16'
+      TargetVpcSubnetId: !ImportValue
+        'Fn::Sub': '${EnvironmentName}-PrivateSubnet1'
+      Description: 'Rota para os recursos privados da VPC'
+
+  VpcAuthorizationRule:
+    Type: AWS::EC2::ClientVpnAuthorizationRule
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      TargetNetworkCidr: '10.0.0.0/16'
+      AuthorizeAllGroups: true
+      Description: 'Acesso temporario aos recursos privados da VPC'
+
+Outputs:
+  ClientVpnEndpointId:
+    Description: 'ID do endpoint para gerar o arquivo .ovpn'
+    Value: !Ref ClientVpnEndpoint
+  PrivateSubnetAssociationId:
+    Description: 'Associacao do endpoint com a subnet privada'
+    Value: !Ref PrivateSubnetAssociation

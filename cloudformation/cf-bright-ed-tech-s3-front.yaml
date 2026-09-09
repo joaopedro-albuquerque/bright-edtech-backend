@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Static Website Hosting S3 Temporary without CloudFront - Bright EdTech'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: 'prod-brightedtech'
+
+Resources:
+  S3WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${EnvironmentName}-frontend-site-${AWS::AccountId}'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3WebsiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Sub 'arn:aws:s3:::${S3WebsiteBucket}/*'
+
+Outputs:
+  WebsiteURL:
+    Value: !GetAtt S3WebsiteBucket.WebsiteURL
+    Description: 'Direct HTTP URL for testing Frontend'
+  BucketName:
+    Value: !Ref S3WebsiteBucket
+    Description: 'S3 Bucket Name for uploading build'

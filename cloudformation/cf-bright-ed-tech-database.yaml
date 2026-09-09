@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Camada de Banco de Dados Bright EdTech: PostgreSQL privado em RDS'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: 'prod-brightedtech'
+
+  DBName:
+    Type: String
+    Default: 'brightedtechdb'
+
+  DBUser:
+    Type: String
+    Default: 'dbadmin'
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+
+Resources:
+  # ----------------------------------------------------------------------------
+  # SUBNET GROUP PARA O RDS (subnets privadas, sem endereco IP publico)
+  # ----------------------------------------------------------------------------
+  PrivateDBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: 'Subnets privadas para a instancia PostgreSQL'
+      SubnetIds:
+        - !ImportValue
+          'Fn::Sub': '${EnvironmentName}-PrivateSubnet1'
+        - !ImportValue
+          'Fn::Sub': '${EnvironmentName}-PrivateSubnet2'
+
+  # ----------------------------------------------------------------------------
+  # INSTANCIA RDS POSTGRESQL
+  # ----------------------------------------------------------------------------
+  PostgreSQLDB:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub '${EnvironmentName}-postgres-db'
+      AllocatedStorage: '20'
+      DBInstanceClass: db.t3.micro
+      Engine: postgres
+      DBName: !Ref DBName
+      MasterUsername: !Ref DBUser
+      MasterUserPassword: !Ref DBPassword
+      PubliclyAccessible: false
+      VPCSecurityGroups:
+        - !ImportValue
+          'Fn::Sub': '${EnvironmentName}-RDSSecurityGroup'
+      DBSubnetGroupName: !Ref PrivateDBSubnetGroup
+
+Outputs:
+  RDSEndpoint:
+    Value: !GetAtt PostgreSQLDB.Endpoint.Address
+    Export:
+      Name: !Sub '${EnvironmentName}-RDSEndpoint'
+  RDSPort:
+    Value: !GetAtt PostgreSQLDB.Endpoint.Port
+    Export:
+      Name: !Sub '${EnvironmentName}-RDSPort'

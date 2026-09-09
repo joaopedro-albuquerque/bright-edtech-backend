@@ -1,5 +1,12 @@
 # Modelo de Dados e Schema PostgreSQL
 
+> **Fonte de verdade do schema real**: [`/schema.sql`](../schema.sql) (raiz do projeto).
+> Este documento descreve a arquitetura conceitual; pequenas diferenças de nomes de
+> coluna existem no schema real (ex.: `documentos.chave_s3` em vez de `s3_chave`,
+> `resumos.formato/nivel_conhecimento/tom` capturados por request em vez de herdados
+> do perfil, `usuarios.nome`/`cognito_id` para integração com AWS Cognito). Em caso de
+> divergência, `schema.sql` prevalece.
+
 ## Princípio: Hybrid DB + S3
 
 | Tipo de Dado | Localização | Motivo |
@@ -24,8 +31,8 @@ CREATE TABLE usuarios (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) NOT NULL UNIQUE,
     verificada BOOLEAN DEFAULT false,
-    estilo_preferido VARCHAR(50),              -- ex: "cornell", "resumo_executivo"
-    formato_preferido VARCHAR(50),             -- ex: "markdown", "html"
+    estilo_preferido VARCHAR(50),              -- ex: "linguagem mais direta, brincalhona, algo assim)
+    formato_preferido VARCHAR(50),             -- ex: "cornell", "resumo_executivo"
     objetivos_estudo TEXT,                     -- texto livre (ex: "passar em concurso")
     criado_em TIMESTAMP NOT NULL DEFAULT now(),
     atualizado_em TIMESTAMP NOT NULL DEFAULT now()

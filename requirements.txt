@@ -6,5 +6,4 @@ python-dotenv
 pydantic[email]
 python-multipart
 PyPDF2
-google-genai
 PyJWT

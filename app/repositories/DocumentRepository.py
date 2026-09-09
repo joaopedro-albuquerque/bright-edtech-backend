@@ -224,43 +224,38 @@ class DocumentRepository:
             self.conn.rollback()
             raise RuntimeError(f"Erro no banco de dados ao inserir documento processado: {e}")
         
-    def inserir_resumo_registro_documento(
-        self, usuario_id: UUID, id_documento: UUID, resumo: str
-         ) -> dict:
+    def atualizar_documento_nome(self, documento_id: UUID, nome: str) -> dict | None:
         try:
             with self.conn.cursor() as cursor:
-                query = """
-                    UPDATE documentos
-                    SET resumo = %s, status = 'pronto'
-                    WHERE id = %s AND usuario_id = %s
-                    RETURNING resumo;
-                """
-                valores = (resumo, id_documento, usuario_id)
-                cursor.execute(query, valores)
-                
+                cursor.execute(
+                    """
+                    UPDATE documentos SET nome = %s WHERE id = %s
+                    RETURNING id, usuario_id, pasta_id, nome, chave_s3, status, criado_em;
+                    """,
+                    (nome, documento_id)
+                )
                 row = cursor.fetchone()
+
                 if not row:
-                    raise RuntimeError("Falha ao retornar os dados inseridos (RETURNING vazio).")
-                    
+                    self.conn.rollback()
+                    return None
+
                 self.conn.commit()
                 return dict(row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao inserir resumo: {e}")
+            raise RuntimeError(f"Erro no banco de dados ao atualizar nome do documento: {e}")
 
-    def buscar_resumo_por_id(self, documento_id: UUID, usuario_id: UUID) -> dict | None:
-            try:
-                with self.conn.cursor() as cursor:
-                    query = """
-                        SELECT resumo
-                        FROM documentos
-                        WHERE id = %s AND usuario_id = %s
-                        LIMIT 1;
-                    """
-                    cursor.execute(query, (documento_id, usuario_id))
-                    row = cursor.fetchone()
-                    
-                    return dict(row) if row else None
-                    
-            except Exception as e:
-                raise RuntimeError(f"Erro no banco de dados ao buscar resumo: {e}")
+    def deletar_documento(self, documento_id: UUID, usuario_id: UUID) -> bool:
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute(
+                    "DELETE FROM documentos WHERE id = %s AND usuario_id = %s;",
+                    (documento_id, usuario_id)
+                )
+                deleted = cursor.rowcount > 0
+                self.conn.commit()
+                return deleted
+        except Exception as e:
+            self.conn.rollback()
+            raise RuntimeError(f"Erro no banco de dados ao deletar documento: {e}")

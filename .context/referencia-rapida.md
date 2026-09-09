@@ -68,57 +68,91 @@ IA → Bedrock (Claude 3.5 Sonnet/Haiku via System Prompts)
 
 ## Endpoints API Principais
 
+> Endpoints reais (v1, implementados). `X-User-Id` é obrigatório nas rotas que usam
+> `get_current_user_id`.
+
+### Perfil / Usuário
+```
+POST   /profile                       # Cadastro
+GET    /profile                       # Busca por token (Cognito)
+GET    /profile/{user_id}             # Detalhe
+PUT    /profile/{user_id}             # Editar perfil completo
+DELETE /profile/{user_id}             # Deletar conta
+GET    /profile/{user_id}/dashboard   # Dashboard consolidado
+POST   /profile/{user_id}/perfil      # Onboarding (estilo/formato/objetivos)
+```
+
+### Pastas
+```
+POST   /pastas                        # Criar
+GET    /pastas/user/{user_id}         # Pastas raiz
+GET    /pastas/user/{user_id}/todas   # Todas as pastas
+GET    /pastas/{pasta_id}/conteudo    # Subpastas + documentos
+PUT    /pastas/{pasta_id}             # Renomear
+DELETE /pastas/{pasta_id}             # Deletar
+```
+
 ### Documentos
 ```
-POST   /api/documents              # Upload PDF
-GET    /api/documents              # Listar documentos
-GET    /api/documents/{id}         # Detalhe
-DELETE /api/documents/{id}         # Deletar
+POST   /documentos/upload                     # Upload PDF
+GET    /documentos/{id}/url-visualizacao       # URL pré-assinada (S3)
+PUT    /documentos/{id}                        # Renomear
+DELETE /documentos/{id}                        # Deletar
 ```
 
-### Resumos
+### Resumos (Bedrock)
 ```
-POST   /api/documents/{doc_id}/resumos           # Gerar novo
-GET    /api/documents/{doc_id}/resumos           # Listar
-GET    /api/resumos/{resumo_id}                  # Detalhe
-PUT    /api/resumos/{resumo_id}                  # Atualizar (salvar edições)
-DELETE /api/resumos/{resumo_id}                  # Deletar
+POST   /documentos/{documento_id}/resumos   # Gerar (body: nivel_conhecimento, formato, tom)
+DELETE /resumos/{resumo_id}                 # Deletar
 ```
 
-### Flashcards
+### Flashcards (Bedrock)
 ```
-POST   /api/documents/{doc_id}/flashcards        # Gerar novo
-GET    /api/flashcards/{flashcard_id}/cartoes    # Listar cartões
-POST   /api/cartoes/{cartao_id}/responder        # Registrar resposta (SM-2)
-```
-
-### Quizzes
-```
-POST   /api/documents/{doc_id}/quizzes           # Gerar novo
-POST   /api/questoes/{questao_id}/responder      # Registrar resposta (SM-2)
+POST   /documentos/{documento_id}/flashcards   # Gerar (body: quantidade)
+DELETE /flashcards/{flashcard_id}              # Deletar
 ```
 
-### Daily Mix
+### Quizzes (Bedrock)
 ```
-GET    /api/daily-mix                 # Itens prontos para revisar hoje
+POST   /documentos/{documento_id}/quizzes   # Gerar (body: quantidade)
+DELETE /quizzes/{quiz_id}                   # Deletar
+```
+
+### Revisões / Daily Mix (SM-2)
+```
+GET  /revisoes/hoje                            # Daily Mix consolidado (cartões + questões)
+GET  /revisoes/flashcards                      # Só cartões pendentes
+GET  /revisoes/quizzes                         # Só questões pendentes
+PUT  /revisoes/cartoes/{cartao_id}/avaliar     # body: {qualidade: 1-5}
+PUT  /revisoes/questoes/{questao_id}/avaliar   # body: {qualidade: 1-5}
 ```
 
 ---
 
 ## SM-2 Rápido
 
-**Grade do Usuário:** 1-5
-- **5** → EF ↑, intervalo grande
-- **4** → EF normal, intervalo médio
-- **3** → EF normal, intervalo pequeno (mínimo de progresso)
-- **2** → Volta amanhã
-- **1** → Volta hoje
+Implementado em [`app/services/SpacedRepetitionService.py`](../app/services/SpacedRepetitionService.py).
 
-**Estado Armazenado:**
-- `fator_facilidade` (EF) — começa 2.5, range 1.3-5.0
-- `intervalo_atual` — dias
-- `repeticoes` — contagem
-- `proxima_revisao` — TIMESTAMP
+**Qualidade (1-5)** informada pelo usuário após ver a resposta:
+- **q < 3** (errou) → `repeticoes = 0`, `intervalo_atual = 1`
+- **q >= 3** (acertou):
+  - `repeticoes == 0` → `intervalo_atual = 1`
+  - `repeticoes == 1` → `intervalo_atual = 6`
+  - `repeticoes > 1`  → `intervalo_atual = ceil(intervalo_anterior * EF_atual)`
+  - `repeticoes += 1`
+
+**Fator de Facilidade (EF):**
+```
+EF_novo = EF_atual + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
+EF_novo = max(1.3, EF_novo)   # nunca abaixo de 1.3
+```
+EF inicial de qualquer cartão/questão novo: **2.5**.
+
+**Estado Armazenado** (tabelas `cartoes` e `questoes`, mesma estrutura):
+- `fator_facilidade` (EF) — começa 2.5, mínimo 1.3
+- `intervalo_atual` — dias até a próxima revisão
+- `repeticoes` — acertos consecutivos (nota >= 3)
+- `proxima_revisao` — TIMESTAMP = agora + intervalo_atual dias
 
 ---
 
@@ -158,16 +192,13 @@ s3://bright-bucket/
 ```env
 # AWS
 AWS_REGION=us-east-1
-AWS_BUCKET_NAME=bright-bucket
+S3_BUCKET_NAME=bright-bucket
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
 
-# PostgreSQL
-DB_HOST=postgres.rds.amazonaws.com
-DB_PORT=5432
-DB_NAME=bright_db
-DB_USER=admin
-DB_PASSWORD=...
+# PostgreSQL (ver app/core/database.py)
+DB_HOST=localhost
+DB_NAME=brightedtech
 
 # Bedrock
 BEDROCK_REGION=us-east-1

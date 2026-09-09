@@ -1,6 +1,27 @@
+from enum import Enum
+
 from pydantic import BaseModel, EmailStr
 from uuid import UUID
 from datetime import datetime
+
+
+class EstiloPreferidoEnum(str, Enum):
+    direta = "direta"
+    detalhada = "detalhada"
+    brincalhona = "brincalhona"
+
+
+class FormatoPreferidoEnum(str, Enum):
+    resumo_executivo = "resumo_executivo"
+    cornell = "cornell"
+    fichamento_academico = "fichamento_academico"
+
+
+class OnboardingRequest(BaseModel):
+    estilo_preferido: EstiloPreferidoEnum | None = None
+    formato_preferido: FormatoPreferidoEnum | None = None
+    objetivos_estudo: str | None = None
+
 
 class UsuarioBase(BaseModel):
     email: EmailStr  

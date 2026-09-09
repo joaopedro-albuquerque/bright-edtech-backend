@@ -1,0 +1,72 @@
+from uuid import UUID
+
+
+class ResumoRepository:
+    def __init__(self, conn):
+        self.conn = conn
+
+    def criar(
+        self,
+        documento_id: UUID,
+        usuario_id: UUID,
+        titulo: str,
+        formato: str,
+        nivel_conhecimento: int,
+        tom: str,
+        s3_chave: str,
+        tokens_utilizados: int,
+        modelo_ia: str,
+    ) -> dict:
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    INSERT INTO resumos
+                        (documento_id, usuario_id, titulo, formato, nivel_conhecimento,
+                         tom, s3_chave, tokens_utilizados, modelo_ia)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, documento_id, titulo, formato, nivel_conhecimento,
+                              tom, s3_chave, tokens_utilizados, modelo_ia, criado_em;
+                """
+                cursor.execute(query, (
+                    documento_id, usuario_id, titulo, formato, nivel_conhecimento,
+                    tom, s3_chave, tokens_utilizados, modelo_ia,
+                ))
+                row = cursor.fetchone()
+
+                if not row:
+                    raise RuntimeError("INSERT executado, mas RETURNING não devolveu o resumo.")
+
+                self.conn.commit()
+                return dict(row)
+        except Exception as e:
+            self.conn.rollback()
+            raise RuntimeError(f"Erro no banco de dados ao criar resumo: {e}")
+
+    def buscar_por_id(self, resumo_id: UUID, usuario_id: UUID) -> dict | None:
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    SELECT id, documento_id, titulo, formato, nivel_conhecimento,
+                           tom, s3_chave, tokens_utilizados, modelo_ia, criado_em
+                    FROM resumos
+                    WHERE id = %s AND usuario_id = %s;
+                """
+                cursor.execute(query, (resumo_id, usuario_id))
+                row = cursor.fetchone()
+                return dict(row) if row else None
+        except Exception as e:
+            raise RuntimeError(f"Erro no banco de dados ao buscar resumo: {e}")
+
+    def deletar(self, resumo_id: UUID, usuario_id: UUID) -> bool:
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute(
+                    "DELETE FROM resumos WHERE id = %s AND usuario_id = %s;",
+                    (resumo_id, usuario_id),
+                )
+                deleted = cursor.rowcount > 0
+                self.conn.commit()
+                return deleted
+        except Exception as e:
+            self.conn.rollback()
+            raise RuntimeError(f"Erro no banco de dados ao deletar resumo: {e}")

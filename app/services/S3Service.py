@@ -1,3 +1,4 @@
+import json
 import os
 import io
 import boto3
@@ -46,3 +47,26 @@ class S3Service:
             return io.BytesIO(response['Body'].read())
         except (BotoCoreError, ClientError) as exc:
             raise RuntimeError(f"Falha ao baixar arquivo do S3: {exc}") from exc
+
+    def upload_text(self, content: str, key: str, content_type: str = "text/markdown") -> dict:
+        try:
+            self.client.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=content.encode("utf-8"),
+                ContentType=content_type,
+            )
+        except (BotoCoreError, ClientError) as exc:
+            raise RuntimeError(f"Falha ao enviar texto para S3: {exc}") from exc
+
+        return {"bucket": self.bucket_name, "key": key, "s3_url": f"s3://{self.bucket_name}/{key}"}
+
+    def upload_json(self, data, key: str) -> dict:
+        return self.upload_text(json.dumps(data, ensure_ascii=False, indent=2), key, content_type="application/json")
+
+    def download_json(self, key: str):
+        try:
+            response = self.client.get_object(Bucket=self.bucket_name, Key=key)
+            return json.loads(response["Body"].read())
+        except (BotoCoreError, ClientError) as exc:
+            raise RuntimeError(f"Falha ao baixar JSON do S3: {exc}") from exc

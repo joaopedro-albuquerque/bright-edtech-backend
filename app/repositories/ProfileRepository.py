@@ -1,5 +1,5 @@
 from uuid import UUID
-from app.schemas.user_schema import Usuario, UsuarioBase
+from app.schemas.user_schema import OnboardingRequest, Usuario, UsuarioBase
 
 class ProfileRepository:
     def __init__(self, conn):
@@ -72,6 +72,39 @@ class ProfileRepository:
         except Exception as e:
             self.conn.rollback()
             raise RuntimeError(f"Erro no banco de dados ao atualizar usuário: {e}")
+
+    def atualizar_perfil_onboarding(self, user_id: UUID, perfil: OnboardingRequest) -> Usuario | None:
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    UPDATE usuarios
+                    SET estilo_preferido = COALESCE(%s, estilo_preferido),
+                        formato_preferido = COALESCE(%s, formato_preferido),
+                        objetivos_estudo = COALESCE(%s, objetivos_estudo),
+                        atualizado_em = now()
+                    WHERE id = %s
+                    RETURNING *;
+                """
+
+                cursor.execute(query, (
+                    perfil.estilo_preferido.value if perfil.estilo_preferido else None,
+                    perfil.formato_preferido.value if perfil.formato_preferido else None,
+                    perfil.objetivos_estudo,
+                    user_id
+                ))
+
+                row = cursor.fetchone()
+
+                if not row:
+                    self.conn.rollback()
+                    return None
+
+                self.conn.commit()
+                return Usuario(**row)
+
+        except Exception as e:
+            self.conn.rollback()
+            raise RuntimeError(f"Erro no banco de dados ao salvar perfil de onboarding: {e}")
 
     def buscar_usuario_por_id(self, user_id: UUID) -> Usuario | None:
         try:

@@ -10,6 +10,8 @@ Este diretório contém toda a documentação de contexto do projeto, incluindo 
 - **[ux-ui.md](ux-ui.md)** — Decisões de UX/UI, fluxos e componentes principais
 - **[modelos-resumo.md](modelos-resumo.md)** — Tipos de resumo suportados e System Prompts
 - **[migrations.sql](migrations.sql)** — Script SQL para atualizar banco (tokens + índices)
+- **[plano-de-testes-v2.md](plano-de-testes-v2.md)** — Plano de Testes do TCC (versão ativa: cronograma, casos de teste, matriz de rastreabilidade, UAT com cliente)
+- **[plano-de-testes.md](plano-de-testes.md)** — Versão anterior do Plano de Testes (mantida como registro/histórico)
 
 ## Resumo Rápido
 

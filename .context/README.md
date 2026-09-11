@@ -9,6 +9,7 @@ Este diretório contém toda a documentação de contexto do projeto, incluindo 
 - **[dados.md](dados.md)** — Modelo de dados híbrido (PostgreSQL + S3) e estrutura de schema
 - **[ux-ui.md](ux-ui.md)** — Decisões de UX/UI, fluxos e componentes principais
 - **[modelos-resumo.md](modelos-resumo.md)** — Tipos de resumo suportados e System Prompts
+- **[api-reference.md](api-reference.md)** — Documentação completa de todas as rotas da API, com exemplos reais de request/response, headers de auth e erros (para integração de frontend)
 - **[migrations.sql](migrations.sql)** — Script SQL para atualizar banco (tokens + índices)
 - **[plano-de-testes-v2.md](plano-de-testes-v2.md)** — Plano de Testes do TCC (versão ativa: cronograma, casos de teste, matriz de rastreabilidade, UAT com cliente)
 - **[plano-de-testes.md](plano-de-testes.md)** — Versão anterior do Plano de Testes (mantida como registro/histórico)

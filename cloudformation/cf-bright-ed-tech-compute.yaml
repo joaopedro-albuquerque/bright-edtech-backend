@@ -132,6 +132,10 @@ Resources:
               Value: brightedtechdb
             - Name: S3_BUCKET_NAME
               Value: prod-brightedtech-client-docs-871341458526
+            - Name: BEDROCK_MODEL_SUMMARY
+              Value: anthropic.claude-sonnet-5
+            - Name: BEDROCK_MODEL_EXTRACT
+              Value: anthropic.claude-haiku-4-5-20251001-v1:0
           LogConfiguration:
             LogDriver: awslogs
             Options:

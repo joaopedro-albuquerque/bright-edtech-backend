@@ -36,8 +36,8 @@ class BedrockService:
             "bedrock-runtime",
             region_name=os.getenv("BEDROCK_REGION", os.getenv("AWS_REGION", "us-east-1")),
         )
-        self.modelo_resumo = os.getenv("BEDROCK_MODEL_SUMMARY", "anthropic.claude-3-5-sonnet-20241022-v2:0")
-        self.modelo_extracao = os.getenv("BEDROCK_MODEL_EXTRACT", "anthropic.claude-3-5-haiku-20241022-v1:0")
+        self.modelo_resumo = os.getenv("BEDROCK_MODEL_SUMMARY", "anthropic.claude-sonnet-5")
+        self.modelo_extracao = os.getenv("BEDROCK_MODEL_EXTRACT", "anthropic.claude-haiku-4-5-20251001-v1:0")
 
     def gerar_resumo(self, texto: str, formato: str, nivel_conhecimento: int, tom: str) -> tuple[str, int, str]:
         prompt_base = SYSTEM_PROMPTS_RESUMO.get(formato, SYSTEM_PROMPTS_RESUMO["resumo_executivo"])

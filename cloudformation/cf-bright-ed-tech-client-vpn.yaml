@@ -55,15 +55,9 @@ Resources:
       SubnetId: !ImportValue
         'Fn::Sub': '${EnvironmentName}-PrivateSubnet1'
 
-  VpcRoute:
-    Type: AWS::EC2::ClientVpnRoute
-    DependsOn: PrivateSubnetAssociation
-    Properties:
-      ClientVpnEndpointId: !Ref ClientVpnEndpoint
-      DestinationCidrBlock: '10.0.0.0/16'
-      TargetVpcSubnetId: !ImportValue
-        'Fn::Sub': '${EnvironmentName}-PrivateSubnet1'
-      Description: 'Rota para os recursos privados da VPC'
+  # Nota: nao declaramos uma AWS::EC2::ClientVpnRoute para a VPC aqui porque a
+  # AWS ja cria automaticamente uma rota local para o CIDR da VPC (10.0.0.0/16)
+  # ao associar a subnet acima — declarar de novo causa "Route already exists".
 
   VpcAuthorizationRule:
     Type: AWS::EC2::ClientVpnAuthorizationRule

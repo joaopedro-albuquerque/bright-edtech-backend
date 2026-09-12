@@ -12,11 +12,11 @@ Parameters:
 
   HostedZoneId:
     Type: String
-    Default: 'Z0456467WN47PLSXEP9I'
+    Default: 'Z02019453CUZDPO3T5NKE'
 
   AcmCertificateArn:
     Type: String
-    Default: 'arn:aws:acm:us-east-1:871341458526:certificate/88f247f6-9f6c-43e4-a2bf-df15a2cad952'
+    Default: 'arn:aws:acm:us-east-1:818651033737:certificate/cd10bfeb-10c6-4d9f-adc0-aac58aee2af5'
 
   AppContainerPort:
     Type: Number
@@ -24,7 +24,7 @@ Parameters:
 
   AppImage:
     Type: String
-    Default: '871341458526.dkr.ecr.us-east-1.amazonaws.com/brightedtech-api:latest'
+    Default: '818651033737.dkr.ecr.us-east-1.amazonaws.com/brightedtech-api:latest'
 
 Mappings:
   FargateConfig:
@@ -126,16 +126,16 @@ Resources:
           Environment:
             - Name: AWS_REGION
               Value: us-east-1
-            - Name: DB_HOST
-              Value: prod-brightedtech-postgres-private.cmjuyiy888yf.us-east-1.rds.amazonaws.com
             - Name: DB_NAME
               Value: brightedtechdb
             - Name: S3_BUCKET_NAME
-              Value: prod-brightedtech-client-docs-871341458526
+              Value: prod-brightedtech-client-docs-818651033737
             - Name: BEDROCK_MODEL_SUMMARY
-              Value: anthropic.claude-sonnet-5
+              Value: us.anthropic.claude-haiku-4-5-20251001-v1:0
             - Name: BEDROCK_MODEL_EXTRACT
-              Value: anthropic.claude-haiku-4-5-20251001-v1:0
+              Value: us.anthropic.claude-haiku-4-5-20251001-v1:0
+            - Name: GEMINI_MODEL_FALLBACK
+              Value: gemini-3.6-flash
           LogConfiguration:
             LogDriver: awslogs
             Options:

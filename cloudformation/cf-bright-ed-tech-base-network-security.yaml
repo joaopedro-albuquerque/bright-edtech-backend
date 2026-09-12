@@ -242,7 +242,24 @@ Resources:
                   - secretsmanager:GetSecretValue
                   - ssm:GetParameters
                   - ssm:GetParameter
+                  - ssm:GetParametersByPath
                 Resource: '*'
+              # Descriptografar SecureString do SSM (usa a chave gerenciada aws/ssm)
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                Resource: !Sub 'arn:aws:kms:*:${AWS::AccountId}:key/*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub 'ssm.${AWS::Region}.amazonaws.com'
+              # Permissão para invocar modelos de IA via Bedrock (resumos/flashcards/quizzes)
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - 'arn:aws:bedrock:*::foundation-model/*'
+                  - !Sub 'arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*'
 
 # ----------------------------------------------------------------------------
 # OUTPUTS / EXPORTS

@@ -7,3 +7,4 @@ pydantic[email]
 python-multipart
 PyPDF2
 PyJWT
+google-genai

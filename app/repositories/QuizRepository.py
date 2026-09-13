@@ -48,6 +48,49 @@ class QuizRepository:
             self.conn.rollback()
             raise RuntimeError(f"Erro no banco de dados ao criar quiz: {e}")
 
+    def listar_por_documento(self, documento_id: UUID, usuario_id: UUID) -> list:
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    SELECT id, documento_id, titulo, s3_chave, tokens_utilizados, modelo_ia, criado_em
+                    FROM quizzes
+                    WHERE documento_id = %s AND usuario_id = %s
+                    ORDER BY criado_em DESC;
+                """
+                cursor.execute(query, (documento_id, usuario_id))
+                return [dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            raise RuntimeError(f"Erro no banco de dados ao listar quizzes do documento: {e}")
+
+    def buscar_por_id(self, quiz_id: UUID, usuario_id: UUID) -> dict | None:
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    SELECT id, documento_id, titulo, s3_chave, tokens_utilizados, modelo_ia, criado_em
+                    FROM quizzes
+                    WHERE id = %s AND usuario_id = %s;
+                """
+                cursor.execute(query, (quiz_id, usuario_id))
+                row = cursor.fetchone()
+                return dict(row) if row else None
+        except Exception as e:
+            raise RuntimeError(f"Erro no banco de dados ao buscar quiz: {e}")
+
+    def listar_questoes_por_quiz(self, quiz_id: UUID, usuario_id: UUID) -> list:
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    SELECT id, quiz_id, item_ref, fator_facilidade, intervalo_atual,
+                           repeticoes, proxima_revisao
+                    FROM questoes
+                    WHERE quiz_id = %s AND usuario_id = %s
+                    ORDER BY item_ref ASC;
+                """
+                cursor.execute(query, (quiz_id, usuario_id))
+                return [dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            raise RuntimeError(f"Erro no banco de dados ao listar questões do quiz: {e}")
+
     def deletar(self, quiz_id: UUID, usuario_id: UUID) -> bool:
         try:
             with self.conn.cursor() as cursor:

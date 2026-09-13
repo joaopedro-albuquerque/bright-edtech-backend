@@ -9,9 +9,13 @@ from app.api.dependencies import (
     get_quiz_service,
     get_resumo_service,
 )
-from app.schemas.flashcard_schema import FlashcardCreateRequest, FlashcardResponse
-from app.schemas.quiz_schema import QuizCreateRequest, QuizResponse
-from app.schemas.resumo_schema import ResumoCreateRequest, ResumoResponse
+from app.schemas.flashcard_schema import (
+    FlashcardConteudoResponse,
+    FlashcardCreateRequest,
+    FlashcardResponse,
+)
+from app.schemas.quiz_schema import QuizConteudoResponse, QuizCreateRequest, QuizResponse
+from app.schemas.resumo_schema import ResumoConteudoResponse, ResumoCreateRequest, ResumoResponse
 from app.schemas.user_schema import Pasta, PastaBase, PastaConteudoResponse, PastaListagemResponse
 from app.services.DocumentGeneratorService import DocumentGeneratorService
 from app.services.FlashcardService import FlashcardService
@@ -164,6 +168,31 @@ def gerar_resumo(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 
 
+@documentos_router.get(
+    "/{documento_id}/resumos", response_model=list[ResumoResponse], status_code=status.HTTP_200_OK
+)
+def listar_resumos_do_documento(
+    documento_id: UUID,
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: ResumoService = Depends(get_resumo_service),
+) -> list:
+    return service.listar_por_documento(documento_id, usuario_id)
+
+
+@resumos_router.get(
+    "/{resumo_id}/conteudo", response_model=ResumoConteudoResponse, status_code=status.HTTP_200_OK
+)
+def obter_conteudo_resumo(
+    resumo_id: UUID,
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: ResumoService = Depends(get_resumo_service),
+):
+    try:
+        return service.obter_conteudo(resumo_id, usuario_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
 @resumos_router.delete("/{resumo_id}", status_code=status.HTTP_204_NO_CONTENT)
 def deletar_resumo(
     resumo_id: UUID,
@@ -194,6 +223,31 @@ def gerar_flashcards(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 
 
+@documentos_router.get(
+    "/{documento_id}/flashcards", response_model=list[FlashcardResponse], status_code=status.HTTP_200_OK
+)
+def listar_flashcards_do_documento(
+    documento_id: UUID,
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: FlashcardService = Depends(get_flashcard_service),
+) -> list:
+    return service.listar_por_documento(documento_id, usuario_id)
+
+
+@flashcards_router.get(
+    "/{flashcard_id}/conteudo", response_model=FlashcardConteudoResponse, status_code=status.HTTP_200_OK
+)
+def obter_conteudo_flashcard(
+    flashcard_id: UUID,
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: FlashcardService = Depends(get_flashcard_service),
+):
+    try:
+        return service.obter_conteudo(flashcard_id, usuario_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
 @flashcards_router.delete("/{flashcard_id}", status_code=status.HTTP_204_NO_CONTENT)
 def deletar_flashcard(
     flashcard_id: UUID,
@@ -220,6 +274,31 @@ def gerar_quiz(
 ):
     try:
         return service.gerar_quiz(documento_id, usuario_id, payload.quantidade)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@documentos_router.get(
+    "/{documento_id}/quizzes", response_model=list[QuizResponse], status_code=status.HTTP_200_OK
+)
+def listar_quizzes_do_documento(
+    documento_id: UUID,
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: QuizService = Depends(get_quiz_service),
+) -> list:
+    return service.listar_por_documento(documento_id, usuario_id)
+
+
+@quizzes_router.get(
+    "/{quiz_id}/conteudo", response_model=QuizConteudoResponse, status_code=status.HTTP_200_OK
+)
+def obter_conteudo_quiz(
+    quiz_id: UUID,
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: QuizService = Depends(get_quiz_service),
+):
+    try:
+        return service.obter_conteudo(quiz_id, usuario_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 

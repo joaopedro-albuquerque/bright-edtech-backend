@@ -468,13 +468,49 @@ Content-Type: application/json
   "criado_em": "2026-09-11T16:00:00Z"
 }
 ```
-> O conteúdo real do resumo (markdown) fica em S3 na `s3_chave` — não vem embutido nesta resposta. Se precisar do conteúdo, é necessário buscar via alguma rota/URL pré-assinada equivalente à de documentos (checar se existe endpoint de leitura de conteúdo antes de assumir).
+> O conteúdo real do resumo (markdown) fica em S3 na `s3_chave` — não vem embutido nesta resposta. Para ler o conteúdo, use o item 4.2 abaixo.
 
 **Erro:** `404` — documento não encontrado: `{"detail": "<mensagem>"}`
 
 ---
 
-### 4.2 Deletar resumo — `DELETE /resumos/{resumo_id}`
+### 4.2 Listar resumos de um documento — `GET /documentos/{documento_id}/resumos`
+
+🔒 Auth: `X-User-Id` (header). Usado para o "Document Hub": abrir um documento e ver todos os resumos já gerados para ele.
+
+```
+GET /documentos/c1000000-0000-0000-0000-000000000001/resumos
+X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+```
+
+**Response `200 OK`** (`list[ResumoResponse]`): array no mesmo formato do item 4.1 (metadados apenas, sem `conteudo`), ordenado do mais recente para o mais antigo.
+
+---
+
+### 4.3 Ler conteúdo de um resumo — `GET /resumos/{resumo_id}/conteudo`
+
+🔒 Auth: `X-User-Id` (header). Baixa o markdown do S3 e retorna já pronto pra renderizar.
+
+```
+GET /resumos/d1000000-0000-0000-0000-000000000001/conteudo
+X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+```
+
+**Response `200 OK`** (`ResumoConteudoResponse`):
+```json
+{
+  "id": "d1000000-0000-0000-0000-000000000001",
+  "titulo": "Resumo - Capítulo 1 - Introdução",
+  "conteudo": "# Capítulo 1 — Introdução\n\n## Notas\n..."
+}
+```
+`conteudo` é markdown puro (string) — renderizar com uma lib de markdown-to-html no front.
+
+**Erro:** `404` — `{"detail": "Resumo não encontrado ou não pertence ao usuário."}`
+
+---
+
+### 4.4 Deletar resumo — `DELETE /resumos/{resumo_id}`
 
 🔒 Auth: `X-User-Id` (header).
 
@@ -510,7 +546,48 @@ Content-Type: application/json
 
 **Erro:** `404` — `{"detail": "<mensagem>"}`
 
-### 5.2 Deletar flashcard — `DELETE /flashcards/{flashcard_id}`
+### 5.2 Listar flashcards (sets) de um documento — `GET /documentos/{documento_id}/flashcards`
+
+🔒 Auth: `X-User-Id` (header). Lista os *sets* de flashcards gerados para o documento (não os cartões individuais).
+
+```
+GET /documentos/c1000000-0000-0000-0000-000000000001/flashcards
+X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+```
+
+**Response `200 OK`** (`list[FlashcardResponse]`): array no mesmo formato do 5.1, ordenado do mais recente para o mais antigo.
+
+### 5.3 Ler conteúdo de um set de flashcards — `GET /flashcards/{flashcard_id}/conteudo`
+
+🔒 Auth: `X-User-Id` (header). Retorna **todos** os cartões do set, independente de estarem atrasados ou não (diferente do `/revisoes/*`, que só traz o que venceu).
+
+```
+GET /flashcards/e1000000-0000-0000-0000-000000000001/conteudo
+X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+```
+
+**Response `200 OK`** (`FlashcardConteudoResponse`):
+```json
+{
+  "id": "e1000000-0000-0000-0000-000000000001",
+  "titulo": "Flashcards - Capítulo 1 - Introdução",
+  "cartoes": [
+    {
+      "id": "g1000000-0000-0000-0000-000000000001",
+      "item_ref": "flashcard-1",
+      "fator_facilidade": 2.5,
+      "intervalo_atual": 0,
+      "repeticoes": 0,
+      "proxima_revisao": "2026-09-11T16:05:00Z",
+      "conteudo": { "pergunta": "O que é fotossíntese?", "resposta": "Processo pelo qual plantas convertem luz em energia química." }
+    }
+  ]
+}
+```
+
+**Erro:** `404` — `{"detail": "Flashcard não encontrado ou não pertence ao usuário."}`
+
+### 5.4 Deletar flashcard — `DELETE /flashcards/{flashcard_id}`
 
 🔒 Auth: `X-User-Id`. **Response:** `204 No Content`. **Erro:** `404` — `{"detail": "Flashcard não encontrado"}`
 
@@ -543,7 +620,48 @@ Content-Type: application/json
 
 **Erro:** `404` — `{"detail": "<mensagem>"}`
 
-### 6.2 Deletar quiz — `DELETE /quizzes/{quiz_id}`
+### 6.2 Listar quizzes de um documento — `GET /documentos/{documento_id}/quizzes`
+
+🔒 Auth: `X-User-Id` (header). Lista os quizzes gerados para o documento.
+
+```
+GET /documentos/c1000000-0000-0000-0000-000000000001/quizzes
+X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+```
+
+**Response `200 OK`** (`list[QuizResponse]`): array no mesmo formato do 6.1, ordenado do mais recente para o mais antigo.
+
+### 6.3 Ler conteúdo de um quiz — `GET /quizzes/{quiz_id}/conteudo`
+
+🔒 Auth: `X-User-Id` (header). Retorna **todas** as questões do quiz, independente de estarem atrasadas ou não.
+
+```
+GET /quizzes/f1000000-0000-0000-0000-000000000001/conteudo
+X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+```
+
+**Response `200 OK`** (`QuizConteudoResponse`):
+```json
+{
+  "id": "f1000000-0000-0000-0000-000000000001",
+  "titulo": "Quiz - Capítulo 1 - Introdução",
+  "questoes": [
+    {
+      "id": "h1000000-0000-0000-0000-000000000001",
+      "item_ref": "quiz-1",
+      "fator_facilidade": 2.5,
+      "intervalo_atual": 0,
+      "repeticoes": 0,
+      "proxima_revisao": "2026-09-11T16:10:00Z",
+      "conteudo": { "pergunta": "Qual lei descreve F=ma?", "alternativas": ["1ª Lei de Newton", "2ª Lei de Newton", "3ª Lei de Newton"], "resposta_correta": "2ª Lei de Newton" }
+    }
+  ]
+}
+```
+
+**Erro:** `404` — `{"detail": "Quiz não encontrado ou não pertence ao usuário."}`
+
+### 6.4 Deletar quiz — `DELETE /quizzes/{quiz_id}`
 
 🔒 Auth: `X-User-Id`. **Response:** `204 No Content`. **Erro:** `404` — `{"detail": "Quiz não encontrado"}`
 
@@ -685,5 +803,5 @@ curl -X PUT http://localhost:8000/revisoes/cartoes/g1000000-0000-0000-0000-00000
 
 ---
 
-**Última atualização:** 2026-09-11
+**Última atualização:** 2026-09-13
 **Fonte:** `app/api/routers/*.py` + `app/schemas/*.py` (lidos diretamente do código nesta data)

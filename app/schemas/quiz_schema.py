@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -18,3 +19,19 @@ class QuizResponse(BaseModel):
     criado_em: datetime
 
     model_config = {"from_attributes": True}
+
+
+class QuestaoConteudoItem(BaseModel):
+    id: UUID
+    item_ref: str
+    fator_facilidade: float
+    intervalo_atual: int
+    repeticoes: int
+    proxima_revisao: datetime
+    conteudo: dict[str, Any] | None = None
+
+
+class QuizConteudoResponse(BaseModel):
+    id: UUID
+    titulo: str
+    questoes: list[QuestaoConteudoItem]

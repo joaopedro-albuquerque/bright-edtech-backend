@@ -70,3 +70,10 @@ class S3Service:
             return json.loads(response["Body"].read())
         except (BotoCoreError, ClientError) as exc:
             raise RuntimeError(f"Falha ao baixar JSON do S3: {exc}") from exc
+
+    def download_text(self, key: str) -> str:
+        try:
+            response = self.client.get_object(Bucket=self.bucket_name, Key=key)
+            return response["Body"].read().decode("utf-8")
+        except (BotoCoreError, ClientError) as exc:
+            raise RuntimeError(f"Falha ao baixar texto do S3: {exc}") from exc

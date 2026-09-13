@@ -55,5 +55,16 @@ class ResumoService:
             modelo_ia=modelo_ia,
         )
 
+    def listar_por_documento(self, documento_id: UUID, usuario_id: UUID) -> list:
+        return self.resumo_repo.listar_por_documento(documento_id, usuario_id)
+
+    def obter_conteudo(self, resumo_id: UUID, usuario_id: UUID) -> dict:
+        resumo = self.resumo_repo.buscar_por_id(resumo_id, usuario_id)
+        if not resumo:
+            raise ValueError("Resumo não encontrado ou não pertence ao usuário.")
+
+        texto = self.s3_service.download_text(resumo["s3_chave"])
+        return {"id": resumo["id"], "titulo": resumo["titulo"], "conteudo": texto}
+
     def deletar_resumo(self, resumo_id: UUID, usuario_id: UUID) -> bool:
         return self.resumo_repo.deletar(resumo_id, usuario_id)

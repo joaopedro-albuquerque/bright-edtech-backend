@@ -42,6 +42,21 @@ class ResumoRepository:
             self.conn.rollback()
             raise RuntimeError(f"Erro no banco de dados ao criar resumo: {e}")
 
+    def listar_por_documento(self, documento_id: UUID, usuario_id: UUID) -> list:
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    SELECT id, documento_id, titulo, formato, nivel_conhecimento,
+                           tom, s3_chave, tokens_utilizados, modelo_ia, criado_em
+                    FROM resumos
+                    WHERE documento_id = %s AND usuario_id = %s
+                    ORDER BY criado_em DESC;
+                """
+                cursor.execute(query, (documento_id, usuario_id))
+                return [dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            raise RuntimeError(f"Erro no banco de dados ao listar resumos do documento: {e}")
+
     def buscar_por_id(self, resumo_id: UUID, usuario_id: UUID) -> dict | None:
         try:
             with self.conn.cursor() as cursor:

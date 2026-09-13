@@ -53,5 +53,30 @@ class FlashcardService:
             item_refs=item_refs,
         )
 
+    def listar_por_documento(self, documento_id: UUID, usuario_id: UUID) -> list:
+        return self.flashcard_repo.listar_por_documento(documento_id, usuario_id)
+
+    def obter_conteudo(self, flashcard_id: UUID, usuario_id: UUID) -> dict:
+        flashcard = self.flashcard_repo.buscar_por_id(flashcard_id, usuario_id)
+        if not flashcard:
+            raise ValueError("Flashcard não encontrado ou não pertence ao usuário.")
+
+        cartoes = self.flashcard_repo.listar_cartoes_por_flashcard(flashcard_id, usuario_id)
+
+        try:
+            itens_json = self.s3_service.download_json(flashcard["s3_chave"])
+        except Exception:
+            logger.warning(f"Falha ao baixar conteúdo do S3: {flashcard['s3_chave']}", exc_info=True)
+            itens_json = []
+
+        cartoes_enriquecidos = []
+        for cartao in cartoes:
+            conteudo_item = next(
+                (i for i in itens_json if i.get("item_ref") == cartao["item_ref"]), None
+            )
+            cartoes_enriquecidos.append({**cartao, "conteudo": conteudo_item})
+
+        return {"id": flashcard["id"], "titulo": flashcard["titulo"], "cartoes": cartoes_enriquecidos}
+
     def deletar_flashcard(self, flashcard_id: UUID, usuario_id: UUID) -> bool:
         return self.flashcard_repo.deletar(flashcard_id, usuario_id)

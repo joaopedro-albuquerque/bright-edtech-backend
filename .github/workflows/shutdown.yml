@@ -1,0 +1,60 @@
+name: Shutdown Backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      stop_rds:
+        description: "Parar o RDS também (sem excluir, só parar)"
+        type: boolean
+        default: true
+
+env:
+  AWS_REGION: us-east-1
+  ECS_CLUSTER: prod-brightedtech-cluster
+  CLOUDFORMATION_STACK: cf-bright-ed-tech-compute
+  RDS_INSTANCE_ID: prod-brightedtech-postgres-db
+
+permissions:
+  contents: read
+
+jobs:
+  shutdown:
+    name: Derrubar ECS/ALB e parar RDS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configurar credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Excluir a stack de computação (ECS + ALB)
+        run: |
+          if aws cloudformation describe-stacks --stack-name "$CLOUDFORMATION_STACK" >/dev/null 2>&1; then
+            aws cloudformation delete-stack --stack-name "$CLOUDFORMATION_STACK"
+            echo "Exclusão disparada, aguardando terminar..."
+            aws cloudformation wait stack-delete-complete --stack-name "$CLOUDFORMATION_STACK"
+            echo "Stack de computação excluída."
+          else
+            echo "Stack '$CLOUDFORMATION_STACK' não existe, nada a fazer."
+          fi
+
+      - name: Parar o RDS (sem excluir)
+        if: ${{ inputs.stop_rds }}
+        run: |
+          STATUS=$(aws rds describe-db-instances \
+            --db-instance-identifier "$RDS_INSTANCE_ID" \
+            --query "DBInstances[0].DBInstanceStatus" --output text)
+          echo "Status atual do RDS: $STATUS"
+          if [ "$STATUS" = "available" ]; then
+            aws rds stop-db-instance --db-instance-identifier "$RDS_INSTANCE_ID"
+            echo "Parada disparada. O RDS leva alguns minutos para ficar 'stopped'; não é necessário esperar aqui."
+          else
+            echo "RDS já está em estado '$STATUS', nada a fazer."
+          fi
+
+      - name: Resumo
+        run: |
+          echo "Ambiente desligado. Lembrete: a AWS reinicia automaticamente instâncias RDS paradas após 7 dias."

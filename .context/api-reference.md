@@ -685,30 +685,30 @@ X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
     {
       "id": "g1000000-0000-0000-0000-000000000001",
       "origem_id": "e1000000-0000-0000-0000-000000000001",
-      "item_ref": "flashcard",
+      "item_ref": "card_001",
       "fator_facilidade": 2.5,
       "intervalo_atual": 1,
       "repeticoes": 0,
       "proxima_revisao": "2026-09-11T00:00:00Z",
-      "conteudo": { "frente": "O que é fotossíntese?", "verso": "Processo pelo qual plantas convertem luz em energia química." }
+      "conteudo": { "item_ref": "card_001", "pergunta": "O que é fotossíntese?", "resposta": "Processo pelo qual plantas convertem luz em energia química." }
     }
   ],
   "questoes": [
     {
       "id": "h1000000-0000-0000-0000-000000000001",
       "origem_id": "f1000000-0000-0000-0000-000000000001",
-      "item_ref": "quiz",
+      "item_ref": "q_001",
       "fator_facilidade": 2.5,
       "intervalo_atual": 1,
       "repeticoes": 0,
       "proxima_revisao": "2026-09-11T00:00:00Z",
-      "conteudo": { "pergunta": "Qual lei descreve F=ma?", "alternativas": ["1ª Lei de Newton", "2ª Lei de Newton", "3ª Lei de Newton"], "correta": 1 }
+      "conteudo": { "item_ref": "q_001", "pergunta": "Qual lei descreve F=ma?", "alternativas": ["1ª Lei de Newton", "2ª Lei de Newton", "3ª Lei de Newton", "4ª Lei de Newton"], "resposta_correta": "2ª Lei de Newton" }
     }
   ],
   "total": 2
 }
 ```
-`item_ref` indica a origem (`"flashcard"` ou `"quiz"`); `conteudo` é o payload já resolvido a partir do S3 (pergunta/resposta pronta pra renderizar).
+`item_ref` identifica o item dentro do JSON gerado (ex: `"card_001"`, `"q_001"`) — usado para casar o registro do banco com o conteúdo correspondente no S3. `conteudo` é o payload já resolvido a partir do S3, pronto pra renderizar: **flashcard usa `pergunta`/`resposta`**; **quiz usa `pergunta`/`alternativas`/`resposta_correta`** (a comparação da resposta escolhida é feita no front — não existe validação no backend).
 
 ---
 
@@ -720,19 +720,19 @@ Mesmo formato de item de `cartoes` acima, mas em `list[ItemRevisaoResponse]` (ar
   {
     "id": "g1000000-0000-0000-0000-000000000001",
     "origem_id": "e1000000-0000-0000-0000-000000000001",
-    "item_ref": "flashcard",
+    "item_ref": "card_001",
     "fator_facilidade": 2.5,
     "intervalo_atual": 1,
     "repeticoes": 0,
     "proxima_revisao": "2026-09-11T00:00:00Z",
-    "conteudo": { "frente": "...", "verso": "..." }
+    "conteudo": { "item_ref": "card_001", "pergunta": "...", "resposta": "..." }
   }
 ]
 ```
 
 ### 7.3 Só questões pendentes — `GET /revisoes/quizzes`
 
-Mesmo formato do 7.2, mas para questões de quiz.
+Mesmo formato do 7.2, mas para questões de quiz — `conteudo` vem como `{ "item_ref": "...", "pergunta": "...", "alternativas": [...], "resposta_correta": "..." }`.
 
 ---
 

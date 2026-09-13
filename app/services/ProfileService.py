@@ -2,7 +2,7 @@ import logging
 from uuid import UUID
 
 from app.repositories.ProfileRepository import ProfileRepository
-from app.schemas.user_schema import Usuario, UsuarioBase
+from app.schemas.user_schema import OnboardingRequest, Usuario, UsuarioBase
 
 # Instancia o logger para este arquivo
 logger = logging.getLogger(__name__)
@@ -59,6 +59,22 @@ class ProfileService:
         except Exception as e:
             logger.error(f"Falha ao atualizar dados do usuário {user_id}: {str(e)}", exc_info=True)
             raise RuntimeError("Não foi possível atualizar o perfil do usuário.")
+
+    def atualizar_perfil_onboarding(self, user_id: UUID, perfil: OnboardingRequest) -> Usuario | None:
+        logger.info(f"Salvando respostas de onboarding para o usuário ID: {user_id}")
+        try:
+            usuario_atualizado = self.repo.atualizar_perfil_onboarding(user_id, perfil)
+
+            if not usuario_atualizado:
+                logger.warning(f"Falha no onboarding: Usuário {user_id} não existe na base.")
+            else:
+                logger.info(f"Onboarding do usuário {user_id} salvo com sucesso.")
+
+            return usuario_atualizado
+
+        except Exception as e:
+            logger.error(f"Falha ao salvar onboarding do usuário {user_id}: {str(e)}", exc_info=True)
+            raise RuntimeError("Não foi possível salvar as preferências do usuário.")
 
     def deletar_usuario_por_id(self, user_id: UUID) -> bool:
         logger.warning(f"Solicitação de exclusão permanente recebida para o usuário ID: {user_id}")

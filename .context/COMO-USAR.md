@@ -58,6 +58,7 @@ Bem-vindo! Esta pasta (`.context/`) contém toda a documentação centralizada d
 | **O que é Bright EdTech?** | `visao-geral.md` | Tudo |
 | **Stack/Infraestrutura** | `arquitetura.md` | Stack em Diagrama |
 | **Endpoints da API** | `referencia-rapida.md` | Endpoints API Principais |
+| **Exemplos de request/response de cada rota** | `api-reference.md` | Todo o arquivo |
 | **Schema de BD** | `dados.md` | Schema PostgreSQL Completo |
 | **Modelos de Resumo** | `modelos-resumo.md` | Seções 1-3 |
 | **Algoritmo SM-2** | `dados.md` | Fluxo de Dados (Daily Mix) |

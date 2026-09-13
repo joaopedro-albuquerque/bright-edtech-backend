@@ -23,9 +23,9 @@ class DashboardRepository:
         try:
             with self.conn.cursor() as cursor:
                 query = """
-                    SELECT id, nome, criado_em
-                    FROM documentos
-                    WHERE usuario_id = %s AND resumo IS NOT NULL
+                    SELECT id, titulo AS nome, criado_em
+                    FROM resumos
+                    WHERE usuario_id = %s
                     ORDER BY criado_em DESC
                     LIMIT %s;
                 """
@@ -62,7 +62,7 @@ class DashboardRepository:
     def contar_total_resumos(self, usuario_id: UUID) -> int:
         try:
             with self.conn.cursor() as cursor:
-                query = "SELECT COUNT(*) as total FROM documentos WHERE usuario_id = %s AND resumo IS NOT NULL;"
+                query = "SELECT COUNT(*) as total FROM resumos WHERE usuario_id = %s;"
                 cursor.execute(query, (usuario_id,))
                 result = cursor.fetchone()
                 return result['total'] if result else 0

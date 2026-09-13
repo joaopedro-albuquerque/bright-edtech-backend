@@ -5,7 +5,7 @@ from uuid import UUID
 from app.api.dependencies import get_profile_service, get_dashboard_service
 from app.services.ProfileService import ProfileService
 from app.services.DashboardService import DashboardService
-from app.schemas.user_schema import Usuario, UsuarioBase
+from app.schemas.user_schema import OnboardingRequest, Usuario, UsuarioBase
 from app.schemas.dashboard_schema import DashboardResponse
 from fastapi.security import OAuth2PasswordBearer
 
@@ -76,3 +76,15 @@ def deletar_usuario_por_id(user_id: UUID, service: ProfileService = Depends(get_
 @router.get("/{user_id}/dashboard", response_model=DashboardResponse, status_code=status.HTTP_200_OK)
 def obter_dashboard(user_id: UUID, service: DashboardService = Depends(get_dashboard_service)) -> DashboardResponse:
     return service.obter_dashboard_usuario(user_id)
+
+
+@router.post("/{user_id}/perfil", response_model=Usuario, status_code=status.HTTP_200_OK)
+def salvar_perfil_onboarding(
+    user_id: UUID,
+    perfil: OnboardingRequest,
+    service: ProfileService = Depends(get_profile_service)
+) -> Usuario:
+    usuario_atualizado = service.atualizar_perfil_onboarding(user_id, perfil)
+    if not usuario_atualizado:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+    return usuario_atualizado

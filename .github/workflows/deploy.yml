@@ -1,0 +1,90 @@
+name: Deploy Backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_rds:
+        description: "Ligar o RDS antes do deploy (marque se o ambiente estiver desligado)"
+        type: boolean
+        default: true
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: brightedtech-api
+  ECS_CLUSTER: prod-brightedtech-cluster
+  ECS_SERVICE: prod-brightedtech-api-service
+  CLOUDFORMATION_STACK: cf-bright-ed-tech-compute
+  RDS_INSTANCE_ID: prod-brightedtech-postgres-db
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build, Push e Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Ligar o RDS (se estiver parado)
+        if: ${{ inputs.start_rds }}
+        run: |
+          STATUS=$(aws rds describe-db-instances \
+            --db-instance-identifier "$RDS_INSTANCE_ID" \
+            --query "DBInstances[0].DBInstanceStatus" --output text)
+          echo "Status atual do RDS: $STATUS"
+          if [ "$STATUS" = "stopped" ]; then
+            aws rds start-db-instance --db-instance-identifier "$RDS_INSTANCE_ID"
+            echo "Start disparado, aguardando ficar disponível..."
+            aws rds wait db-instance-available --db-instance-identifier "$RDS_INSTANCE_ID"
+            echo "RDS disponível."
+          else
+            echo "RDS já está em estado '$STATUS', nada a fazer."
+          fi
+
+      - name: Login no ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build e push da imagem Docker
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}-${{ github.run_number }}
+        run: |
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker build -t "$IMAGE_URI" .
+          docker push "$IMAGE_URI"
+          echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy da stack de computação (ECS + ALB)
+        run: |
+          aws cloudformation deploy \
+            --template-file cloudformation/cf-bright-ed-tech-compute.yaml \
+            --stack-name "$CLOUDFORMATION_STACK" \
+            --parameter-overrides \
+              EnvironmentName=prod-brightedtech \
+              AppImage=${{ steps.build-image.outputs.image_uri }} \
+            --capabilities CAPABILITY_IAM \
+            --no-fail-on-empty-changeset
+
+      - name: Aguardar o serviço ECS ficar estável
+        run: |
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE"
+
+      - name: Smoke test
+        run: |
+          sleep 10
+          curl -sf https://api.brightedtech.com.br/ || (echo "Health check falhou" && exit 1)
+          echo "Deploy concluído e respondendo em https://api.brightedtech.com.br/"

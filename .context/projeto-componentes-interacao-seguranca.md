@@ -47,7 +47,7 @@ O backend é organizado em três sub-camadas: **Controllers** (roteamento HTTP /
 | **IngestionService** | Orquestra a ingestão de conteúdo: extração de texto do PDF (`pdf_utils.extrair_texto_do_pdf`), chamada ao `GenerativeAIService` e persistência do artefato gerado. Na implementação, essa responsabilidade está distribuída entre `ResumoService`, `FlashcardService` e `QuizService`, que seguem o mesmo fluxo (buscar PDF → extrair texto → gerar conteúdo → salvar no S3 → persistir metadados). | `S3Service`, `GenerativeAIService`, `DocumentRepository` |
 | **SpacedRepetitionService** | Implementa o algoritmo SM-2 (SuperMemo-2) de repetição espaçada: calcula fator de facilidade, intervalo e próxima data de revisão a partir da nota de qualidade (1–5) informada pelo usuário. | `RevisaoService` (orquestrador que também resolve o conteúdo no S3 e mistura cartões/questões pendentes) |
 | **S3Service** | Abstração de toda a lógica de comunicação com o AWS S3 (upload/download de PDFs, resumos em Markdown e flashcards/quizzes em JSON, geração de URLs pré-assinadas). | Amazon S3 (externo) |
-| **SecretManagerService** | Abstrai a obtenção de credenciais sensíveis (credenciais do banco de dados, chave de API do provedor de IA de fallback) fora do código-fonte. Na implementação atual, é realizada via **AWS Systems Manager Parameter Store (SSM)** — não via AWS Secrets Manager propriamente dito — com parâmetros do tipo `SecureString` decriptados via KMS. O componente é carregado uma única vez por processo (cache em memória) e possui *fallback* para variáveis de ambiente caso o SSM esteja inacessível. | AWS SSM Parameter Store + KMS (externo) |
+| **SecretManagerService** | Abstrai a obtenção de credenciais sensíveis (credenciais do banco de dados, chave de API do provedor de IA de fallback) fora do código-fonte. Na implementação atual, é realizada via **AWS Systems Manager Parameter Store (SSM)**, e não via AWS Secrets Manager propriamente dito, com parâmetros do tipo `SecureString` decriptados via KMS. O componente é carregado uma única vez por processo (cache em memória) e possui *fallback* para variáveis de ambiente caso o SSM esteja inacessível. | AWS SSM Parameter Store + KMS (externo) |
 
 #### Repositories
 
@@ -64,7 +64,7 @@ Todos os repositórios recebem a conexão de banco (`psycopg2`) por injeção de
 
 | Componente | Responsabilidade |
 |---|---|
-| **DatabaseServer (RDS/PostgreSQL)** | Armazena exclusivamente metadados estruturados: usuários, árvore de pastas/documentos, metadados de resumos/flashcards/quizzes e o estado do algoritmo SM-2 (`fator_facilidade`, `intervalo_atual`, `repeticoes`, `proxima_revisao`). Conteúdo pesado (texto de resumo, perguntas/respostas) **não** é armazenado aqui — apenas a referência (`s3_chave`) para o objeto correspondente no S3. |
+| **DatabaseServer (RDS/PostgreSQL)** | Armazena exclusivamente metadados estruturados: usuários, árvore de pastas/documentos, metadados de resumos/flashcards/quizzes e o estado do algoritmo SM-2 (`fator_facilidade`, `intervalo_atual`, `repeticoes`, `proxima_revisao`). Conteúdo pesado (texto de resumo, perguntas/respostas) **não** é armazenado aqui, apenas a referência (`s3_chave`) para o objeto correspondente no S3. |
 
 ### 4.2.4 Sistemas Externos
 
@@ -105,7 +105,7 @@ sequenceDiagram
     AM-->>FE: 401/400 se ausente/inválido, senão prossegue
 ```
 
-**Observação de projeto:** o sistema usa **dois mecanismos de identidade coexistentes**: o JWT do Cognito é usado apenas na primeira busca de perfil (`GET /profile`, para localizar o `usuario_id` a partir do `cognito_id`); a partir daí, o front-end passa a enviar o `X-User-Id` (UUID interno) em todas as demais chamadas. Essa decisão simplifica a validação de identidade nas rotas de domínio, mas concentra a responsabilidade de "não forjar o X-User-Id" inteiramente no cliente — trade-off discutido na seção 4.7.1.
+**Observação de projeto:** o sistema usa **dois mecanismos de identidade coexistentes**: o JWT do Cognito é usado apenas na primeira busca de perfil (`GET /profile`, para localizar o `usuario_id` a partir do `cognito_id`); a partir daí, o front-end passa a enviar o `X-User-Id` (UUID interno) em todas as demais chamadas. Essa decisão simplifica a validação de identidade nas rotas de domínio, mas concentra a responsabilidade de "não forjar o X-User-Id" inteiramente no cliente. Esse ponto é discutido na seção 4.7.1.
 
 ### 4.5.2 Upload de documento e geração de artefato (resumo/flashcard/quiz)
 
@@ -174,7 +174,7 @@ sequenceDiagram
     FC-->>FE: 200 OK
 ```
 
-Esse fluxo ilustra o padrão de **enriquecimento de dados**: o banco guarda apenas o estado de repetição espaçada por item (`item_ref`, `fator_facilidade`, `proxima_revisao`), e o conteúdo textual (pergunta/resposta) é resolvido sob demanda a partir do S3 e combinado em memória antes de retornar ao cliente — evitando duplicar conteúdo pesado no banco relacional.
+Esse fluxo ilustra o padrão de **enriquecimento de dados**: o banco guarda apenas o estado de repetição espaçada por item (`item_ref`, `fator_facilidade`, `proxima_revisao`), e o conteúdo textual (pergunta/resposta) é resolvido sob demanda a partir do S3 e combinado em memória antes de retornar ao cliente, evitando assim duplicar conteúdo pesado no banco relacional.
 
 ### 4.5.4 Revisão diária (Daily Mix / algoritmo SM-2)
 
@@ -219,11 +219,11 @@ O sistema adota um modelo de autenticação em duas camadas, complementares:
 1. **Amazon Cognito como Identity Provider (IdP):** responsável pelo cadastro e login de usuários, aplicando as políticas de senha e emitindo tokens JWT no padrão OAuth2/OIDC.
 2. **Validação do token em toda requisição à API:** um componente central de autenticação (posicionado na borda do backend, antes de qualquer rota de negócio) valida a assinatura, o emissor e a expiração do token JWT recebido no cabeçalho `Authorization: Bearer <token>`. Requisições sem token, com token expirado ou com assinatura inválida são recusadas imediatamente, sem chegar à lógica da aplicação.
 
-Além da validação do token, as rotas de domínio (documentos, resumos, flashcards, quizzes, revisões) usam o identificador do usuário (UUID interno) para saber de quem são os dados solicitados — esse identificador é conferido junto ao token em cada requisição, de forma que as duas informações precisam ser consistentes entre si.
+Além da validação do token, as rotas de domínio (documentos, resumos, flashcards, quizzes, revisões) usam o identificador do usuário (UUID interno) para saber de quem são os dados solicitados. Esse identificador é conferido junto ao token em cada requisição, de forma que as duas informações precisam ser consistentes entre si.
 
 ### 4.7.2 Autorização e controle de acesso a dados
 
-A autorização segue o princípio de **isolamento por usuário em toda consulta de domínio**: cada operação de leitura, atualização ou remoção de um recurso (documento, resumo, flashcard, quiz, cartão de revisão, questão) é sempre restrita ao usuário autenticado dono do recurso. Isso garante isolamento lógico multi-tenant — um usuário nunca consegue ler, alterar ou apagar um recurso que pertence a outro, mesmo que descubra o identificador do recurso, pois a consulta simplesmente não retorna resultado caso o recurso não pertença a ele, resultando em `404 Not Found` (e não `403 Forbidden`, para evitar confirmar a terceiros que o recurso existe).
+A autorização segue o princípio de **isolamento por usuário em toda consulta de domínio**: cada operação de leitura, atualização ou remoção de um recurso (documento, resumo, flashcard, quiz, cartão de revisão, questão) é sempre restrita ao usuário autenticado dono do recurso. Isso garante isolamento lógico multi-tenant: um usuário nunca consegue ler, alterar ou apagar um recurso que pertence a outro, mesmo que descubra o identificador do recurso, pois a consulta simplesmente não retorna resultado caso o recurso não pertença a ele, resultando em `404 Not Found` (e não `403 Forbidden`, para evitar confirmar a terceiros que o recurso existe).
 
 ### 4.7.3 Proteção de dados em trânsito
 
@@ -234,7 +234,7 @@ A autorização segue o princípio de **isolamento por usuário em toda consulta
 ### 4.7.4 Proteção de dados em repouso e gerenciamento de segredos
 
 - **Banco de dados isolado em rede privada:** a instância RDS PostgreSQL reside em subnet privada da VPC, sem IP público, acessível apenas pelo Security Group associado às tasks do ECS.
-- **Credenciais fora do código-fonte:** credenciais do banco de dados e a chave de API do provedor de IA de *fallback* (Google Gemini) são armazenadas como parâmetros `SecureString` no AWS Systems Manager Parameter Store, criptografados com AWS KMS, e obtidas em tempo de execução pela *role* do ECS (nunca hardcoded ou versionadas em `.env` de produção). Em caso de falha de acesso ao SSM, o sistema aplica *fallback* para variáveis de ambiente, com log de aviso — decisão de resiliência que evita indisponibilidade total do serviço por uma falha pontual de permissão.
+- **Credenciais fora do código-fonte:** credenciais do banco de dados e a chave de API do provedor de IA de *fallback* (Google Gemini) são armazenadas como parâmetros `SecureString` no AWS Systems Manager Parameter Store, criptografados com AWS KMS, e obtidas em tempo de execução pela *role* do ECS (nunca hardcoded ou versionadas em `.env` de produção). Em caso de falha de acesso ao SSM, o sistema aplica *fallback* para variáveis de ambiente, com log de aviso. Essa é uma decisão de resiliência que evita indisponibilidade total do serviço por uma falha pontual de permissão.
 - **Bucket S3 privado:** o bucket de artefatos não permite acesso público; todo acesso passa por credenciais da aplicação (upload/download server-side) ou URLs pré-assinadas de curta duração (visualização de PDF).
 - **Princípio do menor privilégio (least privilege) em IAM:** a *IAM Role* atribuída às tasks do ECS concede apenas as permissões estritamente necessárias (leitura/escrita no bucket S3 do projeto, leitura dos parâmetros específicos no SSM e decriptação KMS correspondente), em vez de permissões amplas de conta.
 
@@ -242,11 +242,11 @@ A autorização segue o princípio de **isolamento por usuário em toda consulta
 
 Além do controle de acesso a dados (4.7.2), o sistema também protege o próprio acesso à API como um todo: nenhum endpoint de negócio fica exposto sem autenticação. Isso é resolvido por um componente de autenticação central, posicionado antes de qualquer rota, que intercepta toda requisição recebida pela API e exige um token de acesso válido, emitido pelo Identity Provider (Amazon Cognito), antes de permitir que a requisição prossiga. Requisições sem token, com token expirado ou com token adulterado são recusadas na borda do sistema, sem consumir recursos das camadas de negócio ou de dados.
 
-Essa abordagem — um ponto único e centralizado de verificação, em vez de repetir a checagem em cada rota individualmente — reduz o risco de esquecer de proteger um novo endpoint no futuro, já que a proteção é aplicada por padrão a toda a API, e apenas rotas explicitamente marcadas como públicas (como o health-check) ficam de fora.
+Essa abordagem, com um ponto único e centralizado de verificação em vez de repetir a checagem em cada rota individualmente, reduz o risco de esquecer de proteger um novo endpoint no futuro, já que a proteção é aplicada por padrão a toda a API, e apenas rotas explicitamente marcadas como públicas (como o health-check) ficam de fora.
 
 ### 4.7.6 Auditoria e rastreabilidade
 
-Toda a aplicação registra logs estruturados via biblioteca padrão `logging`, encaminhados ao Amazon CloudWatch Logs pelo driver de logs do ECS. Eventos relevantes para segurança — falhas de autenticação, tentativas de acesso a recursos inexistentes/não pertencentes ao usuário, falhas de comunicação com serviços externos (S3, Bedrock, SSM) — são registrados com nível apropriado (`WARNING`/`ERROR`), permitindo investigação posterior sem expor dados sensíveis nos logs.
+Toda a aplicação registra logs estruturados via biblioteca padrão `logging`, encaminhados ao Amazon CloudWatch Logs pelo driver de logs do ECS. Eventos relevantes para segurança, como falhas de autenticação, tentativas de acesso a recursos inexistentes ou não pertencentes ao usuário e falhas de comunicação com serviços externos (S3, Bedrock, SSM), são registrados com nível apropriado (`WARNING`/`ERROR`), permitindo investigação posterior sem expor dados sensíveis nos logs.
 
 ---
 

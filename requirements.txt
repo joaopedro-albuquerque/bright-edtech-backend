@@ -6,5 +6,5 @@ python-dotenv
 pydantic[email]
 python-multipart
 PyPDF2
-PyJWT
+PyJWT[crypto]>=2.8,<3
 google-genai

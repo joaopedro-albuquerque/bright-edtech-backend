@@ -1,5 +1,4 @@
-import jwt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from uuid import UUID
 
 from app.api.dependencies import get_profile_service, get_dashboard_service
@@ -7,41 +6,38 @@ from app.services.ProfileService import ProfileService
 from app.services.DashboardService import DashboardService
 from app.schemas.user_schema import OnboardingRequest, Usuario, UsuarioBase
 from app.schemas.dashboard_schema import DashboardResponse
-from fastapi.security import OAuth2PasswordBearer
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 
-def extrair_cognito_id(token: str) -> str:
-    try:
-        payload = jwt.decode(token, options={"verify_signature": False})
-        cognito_id = payload.get("sub")
-        
-        if not cognito_id:
-            raise ValueError("Claim 'sub' ausente no token.")
-            
-        return cognito_id
-    except Exception:
+def extrair_cognito_id(request: Request) -> str:
+    # O AuthMiddleware (app/core/auth_middleware.py) já validou a assinatura,
+    # o emissor e a expiração do token antes de a requisição chegar aqui, e
+    # anexou os claims decodificados em request.state.token_claims.
+    claims = getattr(request.state, "token_claims", None)
+    cognito_id = claims.get("sub") if claims else None
+
+    if not cognito_id:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token JWT inválido ou malformado."
         )
 
+    return cognito_id
+
 @router.post("", response_model=Usuario, status_code=status.HTTP_201_CREATED)
 def criar_usuario(
-    usuario: UsuarioBase, 
+    usuario: UsuarioBase,
     service: ProfileService = Depends(get_profile_service)
 ) -> Usuario:
     return service.criar_usuario(usuario)
 
 @router.get("", response_model=Usuario, status_code=status.HTTP_200_OK)
 def buscar_usuario_por_cognito_id(
-    token: str = Depends(oauth2_scheme), 
+    request: Request,
     service: ProfileService = Depends(get_profile_service)
 ) -> Usuario:
-    
-    cognito_id = extrair_cognito_id(token)
+
+    cognito_id = extrair_cognito_id(request)
     usuario = service.buscar_usuario_por_cognito_id(cognito_id)
     
     if not usuario:

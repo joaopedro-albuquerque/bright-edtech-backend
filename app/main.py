@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.auth_middleware import AuthMiddleware
 from app.api.routers.profile import router as profile_router
 from app.api.routers.document import (
     pastas_router,
@@ -33,6 +34,12 @@ origins = [
     "http://localhost:3000",
     "http://127.0.0.1:5173",
 ]
+
+# AuthMiddleware precisa ser registrado ANTES do CORSMiddleware: no Starlette,
+# o último middleware adicionado é o mais externo. Mantendo o CORS por fora,
+# ele consegue anexar os headers de CORS mesmo nas respostas 401 do AuthMiddleware
+# (senão o browser reportaria "erro de CORS" em vez de 401 não autorizado).
+app.add_middleware(AuthMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

@@ -11,11 +11,12 @@ Documentação completa de todas as rotas da API, com exemplos reais de request 
 - **Base URL (dev local):** `http://localhost:8000`
 - **Base URL (produção):** `https://api.bright-edtech.com` (ver `REACT_APP_API_URL`)
 - **Content-Type:** `application/json` em todas as rotas, exceto onde indicado (`multipart/form-data` para upload de arquivo, `application/x-www-form-urlencoded` para os `PUT` de renomear).
-- **Autenticação:** duas formas coexistem hoje:
-  1. **`X-User-Id` (header)** — usado pela maioria das rotas autenticadas. É o `UUID` do usuário na tabela `usuarios`. **Obrigatório** em toda rota marcada como "🔒 Auth: X-User-Id" abaixo. Se ausente → `401`. Se não for um UUID válido → `400`.
-  2. **`Authorization: Bearer <token>` (JWT do Cognito)** — usado **apenas** em `GET /profile` (busca o próprio perfil pelo `sub` do token, sem verificar assinatura no momento).
+- **Autenticação:** duas camadas, ambas obrigatórias (exceto no health-check `GET /` e na documentação automática `/docs`, `/openapi.json`):
+  1. **`Authorization: Bearer <token>` (JWT do Cognito) — exigido em TODA requisição.** Um middleware global (`app/core/auth_middleware.py`) valida a assinatura (RS256, via JWKS do Cognito), o emissor e a expiração do token antes de a requisição alcançar qualquer rota. Token ausente, malformado, expirado ou de outro Client/User Pool → `401` imediatamente, sem executar a rota.
+  2. **`X-User-Id` (header)** — usado pela maioria das rotas de domínio para identificar de qual usuário (UUID da tabela `usuarios`) são os dados solicitados. **Obrigatório** em toda rota marcada como "🔒 Auth: X-User-Id" abaixo, além do Bearer token do item 1. Se ausente → `401`. Se não for um UUID válido → `400`.
+  - Em `GET /profile` o Bearer token também é usado para identificar o usuário diretamente (via claim `sub`), sem precisar de `X-User-Id`.
 - **Erros padrão:**
-  - `401 Unauthorized` — falta `X-User-Id` ou token inválido: `{"detail": "Cabeçalho X-User-Id é obrigatório"}`
+  - `401 Unauthorized` — token ausente/inválido: `{"detail": "Cabeçalho 'Authorization: Bearer <token>' é obrigatório."}` ou `{"detail": "Token de acesso inválido ou expirado."}`; ou falta `X-User-Id`: `{"detail": "Cabeçalho X-User-Id é obrigatório"}`
   - `400 Bad Request` — `X-User-Id` não é um UUID: `{"detail": "X-User-Id inválido"}`
   - `404 Not Found` — recurso não encontrado: `{"detail": "Documento não encontrado"}` (mensagem varia por recurso)
   - `422 Unprocessable Entity` — corpo da requisição não bate com o schema (validação do Pydantic). Formato padrão do FastAPI:
@@ -803,5 +804,5 @@ curl -X PUT http://localhost:8000/revisoes/cartoes/g1000000-0000-0000-0000-00000
 
 ---
 
-**Última atualização:** 2026-09-13
-**Fonte:** `app/api/routers/*.py` + `app/schemas/*.py` (lidos diretamente do código nesta data)
+**Última atualização:** 2026-09-19
+**Fonte:** `app/api/routers/*.py` + `app/schemas/*.py` + `app/core/auth_middleware.py` (lidos diretamente do código nesta data)

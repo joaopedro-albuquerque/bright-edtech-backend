@@ -110,38 +110,39 @@ sequenceDiagram
 ### 4.5.2 Upload de documento e geração de artefato (resumo/flashcard/quiz)
 
 ```mermaid
+%%{init: {'sequence': {'actorMargin': 30, 'messageMargin': 20, 'boxMargin': 6, 'diagramMarginX': 10, 'diagramMarginY': 10}}}%%
 sequenceDiagram
     participant FE as front-end
     participant DC as DocumentController
     participant DGS as DocumentGeneratorService
     participant Repo as DocumentRepository
     participant S3S as S3Service
-    participant Ing as IngestionService (Resumo/Flashcard/QuizService)
-    participant IA as GenerativeAIService (Bedrock/Gemini)
+    participant Ing as IngestionService
+    participant IA as GenerativeAIService
     participant S3 as Amazon S3
     participant DB as PostgreSQL
 
-    FE->>DC: POST /documentos/upload (multipart: PDF, pasta_id, user_id)
+    FE->>DC: POST /documentos/upload<br/>(multipart: PDF, pasta_id, user_id)
     DC->>DGS: salvar_documento(...)
     DGS->>S3S: upload_file(pdf)
     S3S->>S3: PutObject
-    DGS->>Repo: criar registro em "documentos"
+    DGS->>Repo: criar registro em<br/>"documentos"
     Repo->>DB: INSERT
-    DGS-->>DC: documento criado (status=pendente)
+    DGS-->>DC: documento criado<br/>(status=pendente)
     DC-->>FE: 201 Created
 
-    FE->>DC: POST /documentos/{id}/resumos (nivel, formato, tom)
-    DC->>Ing: gerar_resumo(documento_id, usuario_id, ...)
-    Ing->>Repo: buscar_chave_s3_por_documento_id_e_usuario
-    Repo->>DB: SELECT (valida posse via usuario_id)
+    FE->>DC: POST /documentos/{id}/resumos<br/>(nivel, formato, tom)
+    DC->>Ing: gerar_resumo(documento_id,<br/>usuario_id, ...)
+    Ing->>Repo: buscar_chave_s3<br/>(documento_id, usuario_id)
+    Repo->>DB: SELECT<br/>(valida posse via usuario_id)
     Ing->>S3S: download_file(chave_s3)
     S3S->>S3: GetObject (PDF)
     Ing->>Ing: extrair_texto_do_pdf(pdf)
-    Ing->>IA: gerar_resumo(texto, formato, nivel, tom)
-    IA-->>Ing: texto gerado + tokens + modelo
-    Ing->>S3S: upload_text(markdown, nova_chave)
+    Ing->>IA: gerar_resumo(texto, formato,<br/>nivel, tom)
+    IA-->>Ing: texto gerado +<br/>tokens + modelo
+    Ing->>S3S: upload_text(markdown,<br/>nova_chave)
     S3S->>S3: PutObject
-    Ing->>Repo: criar(resumo, s3_chave, metadados)
+    Ing->>Repo: criar(resumo, s3_chave,<br/>metadados)
     Repo->>DB: INSERT
     Ing-->>DC: ResumoResponse
     DC-->>FE: 201 Created
@@ -152,6 +153,7 @@ O mesmo padrão de colaboração (buscar PDF → extrair texto → chamar IA →
 ### 4.5.3 Consulta de conteúdo por documento (Document Hub)
 
 ```mermaid
+%%{init: {'sequence': {'actorMargin': 30, 'messageMargin': 20, 'boxMargin': 6, 'diagramMarginX': 10, 'diagramMarginY': 10}}}%%
 sequenceDiagram
     participant FE as front-end
     participant FC as FlashcardController
@@ -161,16 +163,16 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant S3 as Amazon S3
 
-    FE->>FC: GET /flashcards/{flashcard_id}/conteudo (X-User-Id)
-    FC->>FS: obter_conteudo(flashcard_id, usuario_id)
-    FS->>Repo: buscar_por_id(flashcard_id, usuario_id)
-    Repo->>DB: SELECT ... WHERE id=? AND usuario_id=?
-    FS->>Repo: listar_cartoes_por_flashcard(flashcard_id, usuario_id)
-    Repo->>DB: SELECT cartoes WHERE flashcard_id=? AND usuario_id=?
+    FE->>FC: GET /flashcards/{id}/conteudo<br/>(X-User-Id)
+    FC->>FS: obter_conteudo(flashcard_id,<br/>usuario_id)
+    FS->>Repo: buscar_por_id(flashcard_id,<br/>usuario_id)
+    Repo->>DB: SELECT ... WHERE id=?<br/>AND usuario_id=?
+    FS->>Repo: listar_cartoes<br/>(flashcard_id, usuario_id)
+    Repo->>DB: SELECT cartoes WHERE<br/>flashcard_id=? AND usuario_id=?
     FS->>S3S: download_json(s3_chave)
     S3S->>S3: GetObject
-    FS->>FS: casa cada cartão (item_ref) com seu conteúdo no JSON
-    FS-->>FC: {id, titulo, cartoes:[{..., conteudo}]}
+    FS->>FS: casa cada cartão (item_ref)<br/>com seu conteúdo no JSON
+    FS-->>FC: {id, titulo,<br/>cartoes:[{..., conteudo}]}
     FC-->>FE: 200 OK
 ```
 
@@ -179,6 +181,7 @@ Esse fluxo ilustra o padrão de **enriquecimento de dados**: o banco guarda apen
 ### 4.5.4 Revisão diária (Daily Mix / algoritmo SM-2)
 
 ```mermaid
+%%{init: {'sequence': {'actorMargin': 30, 'messageMargin': 20, 'boxMargin': 6, 'diagramMarginX': 10, 'diagramMarginY': 10}}}%%
 sequenceDiagram
     participant FE as front-end
     participant RC as RevisaoController
@@ -188,20 +191,20 @@ sequenceDiagram
     participant SR as SpacedRepetitionService
     participant DB as PostgreSQL
 
-    FE->>RC: GET /revisoes/hoje (X-User-Id)
+    FE->>RC: GET /revisoes/hoje<br/>(X-User-Id)
     RC->>RS: buscar_daily_mix(usuario_id)
-    RS->>Repo: buscar_pendentes_hoje(usuario_id, "cartoes")
-    Repo->>DB: SELECT ... WHERE usuario_id=? AND proxima_revisao<=now()
-    RS->>S3S: download_json(s3_chave) [uma vez por chave, com cache local]
-    RS->>RS: casa item_ref com conteúdo
+    RS->>Repo: buscar_pendentes_hoje<br/>(usuario_id, "cartoes")
+    Repo->>DB: SELECT ... WHERE usuario_id=?<br/>AND proxima_revisao<=now()
+    RS->>S3S: download_json(s3_chave)<br/>[uma vez por chave, com cache]
+    RS->>RS: casa item_ref<br/>com conteúdo
     RS-->>RC: {cartoes, questoes, total}
-    RC-->>FE: 200 OK (itens já com conteudo resolvido)
+    RC-->>FE: 200 OK<br/>(conteudo já resolvido)
 
-    FE->>RC: PUT /revisoes/cartoes/{id}/avaliar {qualidade: 1-5}
-    RC->>RS: avaliar_cartao(cartao_id, usuario_id, qualidade)
-    RS->>Repo: buscar_por_id(cartao_id, usuario_id, "cartoes")
-    RS->>SR: avaliar(fator_facilidade, intervalo_atual, repeticoes, qualidade)
-    SR-->>RS: novo_estado (fator_facilidade, intervalo_atual, repeticoes, proxima_revisao)
+    FE->>RC: PUT /revisoes/cartoes/{id}/avaliar<br/>{qualidade: 1-5}
+    RC->>RS: avaliar_cartao(cartao_id,<br/>usuario_id, qualidade)
+    RS->>Repo: buscar_por_id(cartao_id,<br/>usuario_id, "cartoes")
+    RS->>SR: avaliar(fator_facilidade,<br/>intervalo_atual, repeticoes, qualidade)
+    SR-->>RS: novo_estado (fator_facilidade,<br/>intervalo_atual, proxima_revisao)
     RS->>Repo: atualizar_estado(...)
     Repo->>DB: UPDATE
     RS-->>RC: AvaliarResponse

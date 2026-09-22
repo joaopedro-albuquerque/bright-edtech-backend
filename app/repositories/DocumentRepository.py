@@ -1,5 +1,4 @@
 from uuid import UUID, uuid4
-from app.schemas.user_schema import Pasta, PastaBase
 # import logging
 # logger = logging.getLogger(__name__)
 
@@ -7,7 +6,7 @@ class DocumentRepository:
     def __init__(self, conn):
         self.conn = conn
 
-    def criar_pasta(self, pasta: PastaBase) -> dict:
+    def criar_pasta(self, usuario_id: UUID, nome: str, pasta_pai_id: UUID | None) -> dict:
         try:
             with self.conn.cursor() as cursor:
                 query = """
@@ -15,7 +14,7 @@ class DocumentRepository:
                     VALUES (%s, %s, %s)
                     RETURNING id, usuario_id, nome, pasta_pai_id, criada_em;
                 """
-                cursor.execute(query, (pasta.usuario_id, pasta.nome, pasta.pasta_pai_id))
+                cursor.execute(query, (usuario_id, nome, pasta_pai_id))
                 row = cursor.fetchone()
                 self.conn.commit()
                 
@@ -125,9 +124,14 @@ class DocumentRepository:
         except Exception as e:
             raise RuntimeError(f"Erro no banco de dados ao listar todas as pastas: {e}")
     
-    def listar_conteudo_pasta(self, pasta_id: UUID, limit: int, offset: int) -> dict:
+    def listar_conteudo_pasta(self, pasta_id: UUID, usuario_id: UUID, limit: int, offset: int) -> dict | None:
         try:
             with self.conn.cursor() as cursor:
+                # 0. Garante que a pasta pertence ao usuário antes de listar
+                cursor.execute("SELECT 1 FROM pastas WHERE id = %s AND usuario_id = %s;", (pasta_id, usuario_id))
+                if not cursor.fetchone():
+                    return None
+
                 # 1. Buscar subpastas imediatas
                 query_subpastas = """
                     SELECT id, nome, criada_em 
@@ -168,12 +172,13 @@ class DocumentRepository:
         except Exception as e:
             raise RuntimeError(f"Erro no banco de dados ao listar conteúdo da pasta: {e}")
 
-    def atualizar_pasta_nome(self, pasta_id: UUID, nome: str) -> dict | None:
+    def atualizar_pasta_nome(self, pasta_id: UUID, nome: str, usuario_id: UUID) -> dict | None:
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute(
-                    "UPDATE pastas SET nome = %s WHERE id = %s RETURNING id, usuario_id, pasta_pai_id, nome, criada_em;",
-                    (nome, pasta_id)
+                    "UPDATE pastas SET nome = %s WHERE id = %s AND usuario_id = %s "
+                    "RETURNING id, usuario_id, pasta_pai_id, nome, criada_em;",
+                    (nome, pasta_id, usuario_id)
                 )
                 row = cursor.fetchone()
                 
@@ -187,12 +192,12 @@ class DocumentRepository:
             self.conn.rollback()
             raise RuntimeError(f"Erro no banco de dados ao atualizar nome da pasta: {e}")
 
-    def deletar_pasta(self, pasta_id: UUID) -> bool:
+    def deletar_pasta(self, pasta_id: UUID, usuario_id: UUID) -> bool:
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute(
-                    "DELETE FROM pastas WHERE id = %s;",
-                    (pasta_id,)
+                    "DELETE FROM pastas WHERE id = %s AND usuario_id = %s;",
+                    (pasta_id, usuario_id)
                 )
                 deleted = cursor.rowcount > 0
                 self.conn.commit()
@@ -224,15 +229,15 @@ class DocumentRepository:
             self.conn.rollback()
             raise RuntimeError(f"Erro no banco de dados ao inserir documento processado: {e}")
         
-    def atualizar_documento_nome(self, documento_id: UUID, nome: str) -> dict | None:
+    def atualizar_documento_nome(self, documento_id: UUID, nome: str, usuario_id: UUID) -> dict | None:
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute(
                     """
-                    UPDATE documentos SET nome = %s WHERE id = %s
+                    UPDATE documentos SET nome = %s WHERE id = %s AND usuario_id = %s
                     RETURNING id, usuario_id, pasta_id, nome, chave_s3, status, criado_em;
                     """,
-                    (nome, documento_id)
+                    (nome, documento_id, usuario_id)
                 )
                 row = cursor.fetchone()
 

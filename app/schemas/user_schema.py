@@ -47,6 +47,12 @@ class PastaBase(BaseModel):
     pasta_pai_id: UUID | None = None
 
 
+class PastaCreateRequest(BaseModel):
+    """Corpo do POST /pastas: usuario_id vem do token (Depends(get_current_user_id)), não do cliente."""
+    nome: str
+    pasta_pai_id: UUID | None = None
+
+
 class Pasta(PastaBase):
     id: UUID
     criada_em: datetime

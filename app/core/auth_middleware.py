@@ -33,6 +33,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS" or request.url.path in CAMINHOS_PUBLICOS:
             return await call_next(request)
 
+        # Liberando a rota /profile no middleware pra POST
+        if request.url.path == "/profile" and request.method == "POST":
+            return await call_next(request)
+
         auth_header = request.headers.get("authorization", "")
         if not auth_header.lower().startswith("bearer "):
             return JSONResponse(

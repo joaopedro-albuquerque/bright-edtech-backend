@@ -49,6 +49,21 @@ class DashboardRepository:
         except Exception as e:
             raise RuntimeError(f"Erro no banco de dados ao buscar os últimos quizzes: {e}")
 
+    def buscar_documentos_recentes(self, usuario_id: UUID, limit: int = 10) -> list:
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    SELECT id, nome, criado_em
+                    FROM documentos
+                    WHERE usuario_id = %s
+                    ORDER BY criado_em DESC
+                    LIMIT %s;
+                """
+                cursor.execute(query, (usuario_id, limit))
+                return cursor.fetchall()
+        except Exception as e:
+            raise RuntimeError(f"Erro no banco de dados ao buscar documentos recentes: {e}")
+
     def contar_total_flashcards(self, usuario_id: UUID) -> int:
         try:
             with self.conn.cursor() as cursor:

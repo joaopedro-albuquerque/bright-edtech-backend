@@ -11,3 +11,4 @@ PyJWT[crypto]>=2.8,<3
 google-genai
 markdown
 xhtml2pdf
+PyPDF2

@@ -1,12 +1,17 @@
 import io
 import markdown as markdown_lib
 from xhtml2pdf import pisa
+from pathlib import Path
+
+# Se este script for o pdf_generator.py dentro de /services,
+# .parent.parent aponta para o diretório raiz (app) que contém 'services' e 'static'
+CAMINHO_BASE = Path(__file__).resolve().parent.parent 
+CAMINHO_FONTE = CAMINHO_BASE / "static" / "fonts" / "DM_Sans" / "dm-sans-black.ttf"
 
 def aplicar_marcacao_dagua(html_content: str) -> str:
-    """Aplica marca d'água fixa em texto ao HTML do PDF."""
     watermark_html = """
 <div style="position:absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); 
-font-size: 12pt; color: #ccc; opacity: 0.25; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+font-size: 40pt; font-family: 'DM Sans'; font-weight: 900; color: #1d4ed8; opacity: 0.5;
 white-space: nowrap; text-transform: uppercase; letter-spacing: 1px; z-index: -1;">
 Bright EdTech
 </div>
@@ -20,6 +25,12 @@ _TEMPLATE = """
 <html>
 <head>
 <style>
+@font-face {{
+    font-family: 'DM Sans';
+    src: url('{caminho_fonte}'); 
+    font-weight: 900;
+}}
+
 @page {{ size: A4; margin: 2.2cm 1.8cm; }}
 body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11pt; color: #1a1a1a; line-height: 1.5; }}
 h1 {{ font-size: 20pt; color: #16324f; border-bottom: 2px solid #16324f; padding-bottom: 8px; margin-bottom: 16px; }}
@@ -49,14 +60,18 @@ hr {{ border: none; border-top: 1px solid #cbd5e0; margin: 16px 0; }}
 """
 
 def gerar_pdf_de_markdown(markdown_texto: str, titulo: str) -> bytes:
-    # Converte markdown para HTML
     corpo_html = markdown_lib.markdown(
         markdown_texto, 
         extensions=["tables", "fenced_code"]
     )
     
-    # Aplica marca d'água de texto ao conteúdo HTML
-    html_completo = aplicar_marcacao_dagua(_TEMPLATE.format(titulo=titulo, corpo_html=corpo_html))
+    html_formatado = _TEMPLATE.format(
+        titulo=titulo, 
+        corpo_html=corpo_html,
+        caminho_fonte=CAMINHO_FONTE.as_posix()
+    )
+    
+    html_completo = aplicar_marcacao_dagua(html_formatado)
     
     buffer = io.BytesIO()
     resultado = pisa.CreatePDF(src=html_completo, dest=buffer)

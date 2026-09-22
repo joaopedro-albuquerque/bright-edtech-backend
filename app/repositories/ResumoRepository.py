@@ -72,6 +72,26 @@ class ResumoRepository:
         except Exception as e:
             raise RuntimeError(f"Erro no banco de dados ao buscar resumo: {e}")
 
+    def atualizar_titulo(self, resumo_id: UUID, usuario_id: UUID, titulo: str) -> dict | None:
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    UPDATE resumos SET titulo = %s, atualizado_em = now()
+                    WHERE id = %s AND usuario_id = %s
+                    RETURNING id, documento_id, titulo, formato, nivel_conhecimento,
+                              tom, s3_chave, tokens_utilizados, modelo_ia, criado_em;
+                """
+                cursor.execute(query, (titulo, resumo_id, usuario_id))
+                row = cursor.fetchone()
+                if not row:
+                    self.conn.rollback()
+                    return None
+                self.conn.commit()
+                return dict(row)
+        except Exception as e:
+            self.conn.rollback()
+            raise RuntimeError(f"Erro no banco de dados ao renomear resumo: {e}")
+
     def deletar(self, resumo_id: UUID, usuario_id: UUID) -> bool:
         try:
             with self.conn.cursor() as cursor:

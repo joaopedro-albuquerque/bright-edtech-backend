@@ -78,5 +78,8 @@ class FlashcardService:
 
         return {"id": flashcard["id"], "titulo": flashcard["titulo"], "cartoes": cartoes_enriquecidos}
 
+    def renomear_flashcard(self, flashcard_id: UUID, usuario_id: UUID, titulo: str) -> dict | None:
+        return self.flashcard_repo.atualizar_titulo(flashcard_id, usuario_id, titulo)
+
     def deletar_flashcard(self, flashcard_id: UUID, usuario_id: UUID) -> bool:
         return self.flashcard_repo.deletar(flashcard_id, usuario_id)

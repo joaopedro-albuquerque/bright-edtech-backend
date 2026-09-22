@@ -78,5 +78,8 @@ class QuizService:
 
         return {"id": quiz["id"], "titulo": quiz["titulo"], "questoes": questoes_enriquecidas}
 
+    def renomear_quiz(self, quiz_id: UUID, usuario_id: UUID, titulo: str) -> dict | None:
+        return self.quiz_repo.atualizar_titulo(quiz_id, usuario_id, titulo)
+
     def deletar_quiz(self, quiz_id: UUID, usuario_id: UUID) -> bool:
         return self.quiz_repo.deletar(quiz_id, usuario_id)

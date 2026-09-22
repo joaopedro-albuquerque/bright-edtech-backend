@@ -12,10 +12,21 @@ from app.api.dependencies import (
 from app.schemas.flashcard_schema import (
     FlashcardConteudoResponse,
     FlashcardCreateRequest,
+    FlashcardRenomearRequest,
     FlashcardResponse,
 )
-from app.schemas.quiz_schema import QuizConteudoResponse, QuizCreateRequest, QuizResponse
-from app.schemas.resumo_schema import ResumoConteudoResponse, ResumoCreateRequest, ResumoResponse
+from app.schemas.quiz_schema import (
+    QuizConteudoResponse,
+    QuizCreateRequest,
+    QuizRenomearRequest,
+    QuizResponse,
+)
+from app.schemas.resumo_schema import (
+    ResumoConteudoResponse,
+    ResumoCreateRequest,
+    ResumoRenomearRequest,
+    ResumoResponse,
+)
 from app.schemas.user_schema import Pasta, PastaConteudoResponse, PastaCreateRequest, PastaListagemResponse
 from app.services.DocumentGeneratorService import DocumentGeneratorService
 from app.services.FlashcardService import FlashcardService
@@ -207,6 +218,19 @@ def obter_conteudo_resumo(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 
 
+@resumos_router.put("/{resumo_id}", response_model=ResumoResponse, status_code=status.HTTP_200_OK)
+def renomear_resumo(
+    resumo_id: UUID,
+    payload: ResumoRenomearRequest,
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: ResumoService = Depends(get_resumo_service),
+):
+    resumo_atualizado = service.renomear_resumo(resumo_id, usuario_id, payload.titulo)
+    if not resumo_atualizado:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resumo não encontrado")
+    return resumo_atualizado
+
+
 @resumos_router.delete("/{resumo_id}", status_code=status.HTTP_204_NO_CONTENT)
 def deletar_resumo(
     resumo_id: UUID,
@@ -262,6 +286,19 @@ def obter_conteudo_flashcard(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 
 
+@flashcards_router.put("/{flashcard_id}", response_model=FlashcardResponse, status_code=status.HTTP_200_OK)
+def renomear_flashcard(
+    flashcard_id: UUID,
+    payload: FlashcardRenomearRequest,
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: FlashcardService = Depends(get_flashcard_service),
+):
+    flashcard_atualizado = service.renomear_flashcard(flashcard_id, usuario_id, payload.titulo)
+    if not flashcard_atualizado:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flashcard não encontrado")
+    return flashcard_atualizado
+
+
 @flashcards_router.delete("/{flashcard_id}", status_code=status.HTTP_204_NO_CONTENT)
 def deletar_flashcard(
     flashcard_id: UUID,
@@ -315,6 +352,19 @@ def obter_conteudo_quiz(
         return service.obter_conteudo(quiz_id, usuario_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@quizzes_router.put("/{quiz_id}", response_model=QuizResponse, status_code=status.HTTP_200_OK)
+def renomear_quiz(
+    quiz_id: UUID,
+    payload: QuizRenomearRequest,
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: QuizService = Depends(get_quiz_service),
+):
+    quiz_atualizado = service.renomear_quiz(quiz_id, usuario_id, payload.titulo)
+    if not quiz_atualizado:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz não encontrado")
+    return quiz_atualizado
 
 
 @quizzes_router.delete("/{quiz_id}", status_code=status.HTTP_204_NO_CONTENT)

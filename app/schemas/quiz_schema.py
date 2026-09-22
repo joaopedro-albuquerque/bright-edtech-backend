@@ -9,6 +9,10 @@ class QuizCreateRequest(BaseModel):
     quantidade: int = Field(10, ge=1, le=50)
 
 
+class QuizRenomearRequest(BaseModel):
+    titulo: str = Field(..., min_length=1, max_length=255)
+
+
 class QuizResponse(BaseModel):
     id: UUID
     documento_id: UUID | None = None

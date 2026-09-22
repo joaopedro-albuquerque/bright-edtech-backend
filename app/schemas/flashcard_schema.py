@@ -9,6 +9,10 @@ class FlashcardCreateRequest(BaseModel):
     quantidade: int = Field(10, ge=1, le=50)
 
 
+class FlashcardRenomearRequest(BaseModel):
+    titulo: str = Field(..., min_length=1, max_length=255)
+
+
 class FlashcardResponse(BaseModel):
     id: UUID
     documento_id: UUID | None = None

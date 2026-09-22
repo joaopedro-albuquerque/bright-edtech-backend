@@ -91,6 +91,25 @@ class QuizRepository:
         except Exception as e:
             raise RuntimeError(f"Erro no banco de dados ao listar questões do quiz: {e}")
 
+    def atualizar_titulo(self, quiz_id: UUID, usuario_id: UUID, titulo: str) -> dict | None:
+        try:
+            with self.conn.cursor() as cursor:
+                query = """
+                    UPDATE quizzes SET titulo = %s
+                    WHERE id = %s AND usuario_id = %s
+                    RETURNING id, documento_id, titulo, s3_chave, tokens_utilizados, modelo_ia, criado_em;
+                """
+                cursor.execute(query, (titulo, quiz_id, usuario_id))
+                row = cursor.fetchone()
+                if not row:
+                    self.conn.rollback()
+                    return None
+                self.conn.commit()
+                return dict(row)
+        except Exception as e:
+            self.conn.rollback()
+            raise RuntimeError(f"Erro no banco de dados ao renomear quiz: {e}")
+
     def deletar(self, quiz_id: UUID, usuario_id: UUID) -> bool:
         try:
             with self.conn.cursor() as cursor:

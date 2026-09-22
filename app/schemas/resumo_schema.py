@@ -17,6 +17,10 @@ class ResumoCreateRequest(BaseModel):
     tom: str
 
 
+class ResumoRenomearRequest(BaseModel):
+    titulo: str = Field(..., min_length=1, max_length=255)
+
+
 class ResumoResponse(BaseModel):
     id: UUID
     documento_id: UUID

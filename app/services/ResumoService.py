@@ -66,5 +66,8 @@ class ResumoService:
         texto = self.s3_service.download_text(resumo["s3_chave"])
         return {"id": resumo["id"], "titulo": resumo["titulo"], "conteudo": texto}
 
+    def renomear_resumo(self, resumo_id: UUID, usuario_id: UUID, titulo: str) -> dict | None:
+        return self.resumo_repo.atualizar_titulo(resumo_id, usuario_id, titulo)
+
     def deletar_resumo(self, resumo_id: UUID, usuario_id: UUID) -> bool:
         return self.resumo_repo.deletar(resumo_id, usuario_id)

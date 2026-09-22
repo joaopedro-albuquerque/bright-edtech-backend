@@ -2,24 +2,13 @@ import io
 import markdown as markdown_lib
 from xhtml2pdf import pisa
 from pathlib import Path
+from pypdf import PdfReader, PdfWriter
+from reportlab.pdfgen import canvas
+from reportlab.lib.colors import Color
 
-# Se este script for o pdf_generator.py dentro de /services,
-# .parent.parent aponta para o diretório raiz (app) que contém 'services' e 'static'
+# Configuração de caminhos
 CAMINHO_BASE = Path(__file__).resolve().parent.parent 
 CAMINHO_FONTE = CAMINHO_BASE / "static" / "fonts" / "DM_Sans" / "dm-sans-black.ttf"
-
-def aplicar_marcacao_dagua(html_content: str) -> str:
-    watermark_html = """
-<div style="position:absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); 
-font-size: 40pt; font-family: 'DM Sans'; font-weight: 900; color: #1d4ed8; opacity: 0.5;
-white-space: nowrap; text-transform: uppercase; letter-spacing: 1px; z-index: -1;">
-Bright EdTech
-</div>
-<div style="position:absolute; bottom: 2cm; right: 1cm; font-size: 7pt; color: #999; font-family: Helvetica, Arial, sans-serif; z-index: -1;">
-https://app.edtech.bright.com.br/resumos
-</div>
-"""
-    return html_content + watermark_html
 
 _TEMPLATE = """
 <html>
@@ -41,8 +30,8 @@ ul, ol {{ margin: 6px 0; padding-left: 20px; }}
 li {{ margin: 3px 0; }}
 strong {{ color: #16324f; }}
 blockquote {{
-margin: 10px 0; padding: 8px 14px; border-left: 3px solid #a0aec0;
-background-color: #f7fafc; font-style: italic; color: #4a5568;
+    margin: 10px 0; padding: 8px 14px; border-left: 3px solid #a0aec0;
+    background-color: #f7fafc; font-style: italic; color: #4a5568;
 }}
 table {{ border-collapse: collapse; width: 100%; margin: 12px 0; }}
 th, td {{ border: 1px solid #cbd5e0; padding: 7px 10px; text-align: left; font-size: 10pt; }}
@@ -50,14 +39,71 @@ th {{ background-color: #16324f; color: #ffffff; }}
 tr:nth-child(even) {{ background-color: #f7fafc; }}
 hr {{ border: none; border-top: 1px solid #cbd5e0; margin: 16px 0; }}
 .fq-header {{ color: #718096; font-size: 9pt; margin-bottom: 18px; }}
+.footer-text {{ position: absolute; bottom: 2cm; right: 1cm; font-size: 7pt; color: #999; z-index: -1; }}
 </style>
 </head>
 <body>
-<p class="fq-header">Bright EdTech &mdash; {titulo}</p>
-{corpo_html}
+    <div class="footer-text">https://brightedtech.com.br</div>
+    <p class="fq-header">Bright EdTech &mdash; {titulo}</p>
+    {corpo_html}
 </body>
 </html>
 """
+
+def aplicar_marcacao_dagua(pdf_bytes: bytes) -> bytes:
+    """
+    Abordagem alterada: recebe o PDF já renderizado pelo xhtml2pdf (em bytes)
+    e carimba de forma nativa a marca d'água perfeitamente rotacionada e vazada.
+    """
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    writer = PdfWriter()
+    
+    # Tom de azul da Bright EdTech com 30% de opacidade
+    blue_color = Color(0.12, 0.35, 0.65, alpha=0.3)
+    
+    for page_num in range(len(reader.pages)):
+        page = reader.pages[page_num]
+        
+        width = float(page.mediabox.width)
+        height = float(page.mediabox.height)
+        
+        packet = io.BytesIO()
+        c = canvas.Canvas(packet, pagesize=(width, height))
+        
+        # Posicionamento inicial para rotacionar
+        c.translate(width / 2, height / 2)
+        c.rotate(45) # Diagonal idêntica ao modelo
+        
+        c.setStrokeColor(blue_color)
+        c.setLineWidth(2.5) # Espessura do contorno vazado
+        
+        # Lógica da malha da marca d'água
+        span = int(max(width, height) * 1.5)
+        step_x = 650 # Distância horizontal entre as frases
+        step_y = 250 # Distância vertical entre as frases
+        
+        for row, y in enumerate(range(-span, span, step_y)):
+            offset_x = (step_x / 2) if row % 2 != 0 else 0
+            for x in range(-span, span, step_x):
+                t = c.beginText(x + offset_x - 300, y) # Centralização bruta
+                t.setFont("Helvetica-Bold", 70)
+                t.setTextRenderMode(1) # MODO 1 = Texto vazado (Outline stroke)
+                t.textOut("BRIGHT EDTECH")
+                c.drawText(t)
+                
+        c.save()
+        packet.seek(0)
+        
+        # Funde a camada gerada com a página existente
+        watermark_pdf = PdfReader(packet)
+        watermark_page = watermark_pdf.pages[0]
+        page.merge_page(watermark_page)
+        
+        writer.add_page(page)
+
+    output_buffer = io.BytesIO()
+    writer.write(output_buffer)
+    return output_buffer.getvalue()
 
 def gerar_pdf_de_markdown(markdown_texto: str, titulo: str) -> bytes:
     corpo_html = markdown_lib.markdown(
@@ -71,12 +117,14 @@ def gerar_pdf_de_markdown(markdown_texto: str, titulo: str) -> bytes:
         caminho_fonte=CAMINHO_FONTE.as_posix()
     )
     
-    html_completo = aplicar_marcacao_dagua(html_formatado)
-    
     buffer = io.BytesIO()
-    resultado = pisa.CreatePDF(src=html_completo, dest=buffer)
     
+    # 1. Gera o PDF do Miolo (texto) usando xhtml2pdf
+    resultado = pisa.CreatePDF(src=html_formatado, dest=buffer)
     if resultado.err:
         raise RuntimeError(f"Falha ao gerar PDF a partir do markdown (código {resultado.err}).")
     
-    return buffer.getvalue()
+    # 2. Injeta a Marca D'água por cima manipulando o arquivo resultante em memória
+    pdf_final = aplicar_marcacao_dagua(buffer.getvalue())
+    
+    return pdf_final

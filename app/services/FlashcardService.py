@@ -23,8 +23,8 @@ class FlashcardService:
         self.s3_service = s3_service or S3Service()
         self.bedrock_service = bedrock_service or BedrockService()
 
-    def gerar_flashcards(self, documento_id: UUID, usuario_id: UUID, quantidade: int = 10) -> dict:
-        logger.info(f"Gerando {quantidade} flashcards para documento {documento_id}.")
+    def gerar_flashcards(self, documento_id: UUID, usuario_id: UUID, quantidade: int = 10, dificuldade: str = "medio") -> dict:
+        logger.info(f"Gerando {quantidade} flashcards (dificuldade={dificuldade}) para documento {documento_id}.")
 
         documento = self.document_repo.buscar_chave_s3_por_documento_id_e_usuario(documento_id, usuario_id)
         if not documento or not documento.get("chave_s3"):
@@ -34,7 +34,7 @@ class FlashcardService:
         texto_extraido = extrair_texto_do_pdf(arquivo_pdf)
 
         cartoes_json, tokens_utilizados, modelo_ia = self.bedrock_service.gerar_flashcards(
-            texto_extraido, quantidade
+            texto_extraido, quantidade, dificuldade
         )
 
         titulo = "Flashcards Gerados"
@@ -77,6 +77,9 @@ class FlashcardService:
             cartoes_enriquecidos.append({**cartao, "conteudo": conteudo_item})
 
         return {"id": flashcard["id"], "titulo": flashcard["titulo"], "cartoes": cartoes_enriquecidos}
+
+    def renomear_flashcard(self, flashcard_id: UUID, usuario_id: UUID, titulo: str) -> dict | None:
+        return self.flashcard_repo.atualizar_titulo(flashcard_id, usuario_id, titulo)
 
     def deletar_flashcard(self, flashcard_id: UUID, usuario_id: UUID) -> bool:
         return self.flashcard_repo.deletar(flashcard_id, usuario_id)

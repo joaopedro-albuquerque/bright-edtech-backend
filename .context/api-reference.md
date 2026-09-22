@@ -11,12 +11,14 @@ Documentação completa de todas as rotas da API, com exemplos reais de request 
 - **Base URL (dev local):** `http://localhost:8000`
 - **Base URL (produção):** `https://api.bright-edtech.com` (ver `REACT_APP_API_URL`)
 - **Content-Type:** `application/json` em todas as rotas, exceto onde indicado (`multipart/form-data` para upload de arquivo, `application/x-www-form-urlencoded` para os `PUT` de renomear).
-- **Autenticação:** duas formas coexistem hoje:
-  1. **`X-User-Id` (header)** — usado pela maioria das rotas autenticadas. É o `UUID` do usuário na tabela `usuarios`. **Obrigatório** em toda rota marcada como "🔒 Auth: X-User-Id" abaixo. Se ausente → `401`. Se não for um UUID válido → `400`.
-  2. **`Authorization: Bearer <token>` (JWT do Cognito)** — usado **apenas** em `GET /profile` (busca o próprio perfil pelo `sub` do token, sem verificar assinatura no momento).
+- **Autenticação:** duas camadas, ambas obrigatórias (exceto no health-check `GET /` e na documentação automática `/docs`, `/openapi.json`):
+  1. **`Authorization: Bearer <token>` (JWT do Cognito) — exigido em TODA requisição.** Um middleware global (`app/core/auth_middleware.py`) valida a assinatura (RS256, via JWKS do Cognito), o emissor e a expiração do token antes de a requisição alcançar qualquer rota. Token ausente, malformado, expirado ou de outro Client/User Pool → `401` imediatamente, sem executar a rota.
+  2. **`X-User-Id` (header)** — usado pela maioria das rotas de domínio para identificar de qual usuário (UUID da tabela `usuarios`) são os dados solicitados. **Obrigatório** em toda rota marcada como "🔒 Auth: X-User-Id" abaixo, além do Bearer token do item 1. Se ausente → `401`. Se não for um UUID válido → `400`.
+  - Em `GET /profile` o Bearer token também é usado para identificar o usuário diretamente (via claim `sub`), sem precisar de `X-User-Id`.
 - **Erros padrão:**
-  - `401 Unauthorized` — falta `X-User-Id` ou token inválido: `{"detail": "Cabeçalho X-User-Id é obrigatório"}`
+  - `401 Unauthorized` — token ausente/inválido: `{"detail": "Cabeçalho 'Authorization: Bearer <token>' é obrigatório."}` ou `{"detail": "Token de acesso inválido ou expirado."}`; ou falta `X-User-Id`: `{"detail": "Cabeçalho X-User-Id é obrigatório"}`
   - `400 Bad Request` — `X-User-Id` não é um UUID: `{"detail": "X-User-Id inválido"}`
+  - `403 Forbidden` — rotas `/profile/{user_id}*` e `/pastas/user/{user_id}*`: `{"detail": "Acesso negado"}` quando o `user_id` do path não bate com o `X-User-Id`
   - `404 Not Found` — recurso não encontrado: `{"detail": "Documento não encontrado"}` (mensagem varia por recurso)
   - `422 Unprocessable Entity` — corpo da requisição não bate com o schema (validação do Pydantic). Formato padrão do FastAPI:
     ```json
@@ -108,18 +110,23 @@ O backend extrai o claim `sub` do JWT (sem verificar assinatura) e usa como `cog
 
 ### 1.3 Detalhe do usuário — `GET /profile/{user_id}`
 
+🔒 Auth: `X-User-Id` (header) — precisa bater com `user_id` do path, senão `403`.
+
 **Request:** sem body. `user_id` é UUID na URL.
 ```
 GET /profile/3fa85f64-5717-4562-b3fc-2c963f66afa6
+X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 ```
 
 **Response `200 OK`** (`Usuario`): mesmo formato do item 1.1.
 
-**Erro:** `404` — `{"detail": "Usuário não encontrado"}`
+**Erros:** `404` — `{"detail": "Usuário não encontrado"}`; `403` — `{"detail": "Acesso negado"}`.
 
 ---
 
 ### 1.4 Editar perfil completo — `PUT /profile/{user_id}`
+
+🔒 Auth: `X-User-Id` (header) — precisa bater com `user_id` do path, senão `403`.
 
 Substitui os campos editáveis do perfil (envia o objeto completo, não é PATCH parcial — mas os campos são opcionais, então pode reenviar os mesmos valores que já existiam para os que não quer alterar).
 
@@ -162,6 +169,8 @@ Content-Type: application/json
 
 ### 1.5 Deletar conta — `DELETE /profile/{user_id}`
 
+🔒 Auth: `X-User-Id` (header) — precisa bater com `user_id` do path, senão `403`.
+
 **Request:** sem body.
 ```
 DELETE /profile/3fa85f64-5717-4562-b3fc-2c963f66afa6
@@ -174,6 +183,8 @@ DELETE /profile/3fa85f64-5717-4562-b3fc-2c963f66afa6
 ---
 
 ### 1.6 Onboarding — `POST /profile/{user_id}/perfil`
+
+🔒 Auth: `X-User-Id` (header) — precisa bater com `user_id` do path, senão `403`.
 
 Salva as preferências do onboarding (estilo, formato, objetivos). Diferente do 1.4: aqui os campos são validados contra enums fechados.
 
@@ -197,9 +208,12 @@ Salva as preferências do onboarding (estilo, formato, objetivos). Diferente do 
 
 ### 1.7 Dashboard do usuário — `GET /profile/{user_id}/dashboard`
 
+🔒 Auth: `X-User-Id` (header), além do Bearer token global — `user_id` do path precisa bater com o `X-User-Id`, senão `403`.
+
 **Request:** sem body.
 ```
 GET /profile/3fa85f64-5717-4562-b3fc-2c963f66afa6/dashboard
+X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 ```
 
 **Response `200 OK`** (`DashboardResponse`):
@@ -214,11 +228,17 @@ GET /profile/3fa85f64-5717-4562-b3fc-2c963f66afa6/dashboard
   "ultimos_quizzes": [
     { "id": "a1b2c3d4-0000-0000-0000-000000000003", "titulo": "Quiz - Leis de Newton", "criado_em": "2026-09-08T11:15:00Z" }
   ],
+  "documentos_recentes": [
+    { "id": "a1b2c3d4-0000-0000-0000-000000000004", "nome": "Capítulo 1 - Introdução.pdf", "criado_em": "2026-09-10T09:00:00Z" }
+  ],
   "total_flashcards": 12,
   "total_resumos": 5,
   "total_quizzes": 8
 }
 ```
+`documentos_recentes` traz os últimos 10 documentos do usuário (todas as pastas, sem filtro), pra alimentar um atalho de "gerar resumo" direto do dashboard.
+
+**Erro:** `403` — `{"detail": "Acesso negado"}` se `user_id` do path não for o mesmo do `X-User-Id`.
 
 ---
 
@@ -228,11 +248,12 @@ Base path: `/pastas`
 
 ### 2.1 Criar pasta — `POST /pastas`
 
-**Request body** (`PastaBase`):
+🔒 Auth: `X-User-Id` (header) — `usuario_id` **não** é mais aceito no body, vem sempre do header.
+
+**Request body** (`PastaCreateRequest`):
 ```json
 {
   "nome": "Biologia - 3º Ano",
-  "usuario_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "pasta_pai_id": null
 }
 ```
@@ -244,9 +265,12 @@ Base path: `/pastas`
 
 ### 2.2 Listar pastas raiz do usuário — `GET /pastas/user/{user_id}`
 
+🔒 Auth: `X-User-Id` (header) — precisa bater com `user_id` do path, senão `403`.
+
 **Query params:** `limit` (int, padrão 50, 1–100), `offset` (int, padrão 0, ≥0).
 ```
 GET /pastas/user/3fa85f64-5717-4562-b3fc-2c963f66afa6?limit=20&offset=0
+X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 ```
 
 **Response `200 OK`** (`list[PastaListagemResponse]`):
@@ -261,6 +285,8 @@ GET /pastas/user/3fa85f64-5717-4562-b3fc-2c963f66afa6?limit=20&offset=0
 
 ### 2.3 Listar todas as pastas do usuário (árvore completa) — `GET /pastas/user/{user_id}/todas`
 
+🔒 Auth: `X-User-Id` (header) — precisa bater com `user_id` do path, senão `403`.
+
 **Request:** sem query params.
 ```
 GET /pastas/user/3fa85f64-5717-4562-b3fc-2c963f66afa6/todas
@@ -271,6 +297,8 @@ GET /pastas/user/3fa85f64-5717-4562-b3fc-2c963f66afa6/todas
 ---
 
 ### 2.4 Conteúdo de uma pasta (subpastas + documentos) — `GET /pastas/{pasta_id}/conteudo`
+
+🔒 Auth: `X-User-Id` (header). Retorna `404` se a pasta não existir ou não pertencer ao usuário.
 
 **Query params:** `limit` (padrão 50, 1–100), `offset` (padrão 0).
 ```
@@ -297,12 +325,13 @@ GET /pastas/b1000000-0000-0000-0000-000000000001/conteudo?limit=50&offset=0
 
 ### 2.5 Renomear pasta — `PUT /pastas/{pasta_id}`
 
-⚠️ **Não é JSON** — é `multipart/form-data` (via `Form(...)` no FastAPI).
+🔒 Auth: `X-User-Id` (header). ⚠️ **Não é JSON** — é `multipart/form-data` (via `Form(...)` no FastAPI).
 
 **Request:**
 ```
 PUT /pastas/b1000000-0000-0000-0000-000000000001
 Content-Type: multipart/form-data
+X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 
 nome=Biologia - Terceirão
 ```
@@ -330,6 +359,8 @@ await fetch(`/pastas/${pastaId}`, { method: "PUT", body: formData });
 
 ### 2.6 Deletar pasta — `DELETE /pastas/{pasta_id}`
 
+🔒 Auth: `X-User-Id` (header).
+
 **Request:** sem body.
 
 **Response:** `204 No Content`.
@@ -344,12 +375,11 @@ Base path: `/documentos`
 
 ### 3.1 Upload de PDF — `POST /documentos/upload`
 
-⚠️ **`multipart/form-data`** (upload de arquivo + campos de formulário juntos).
+🔒 Auth: `X-User-Id` (header) — `user_id` **não** é mais aceito no form, vem sempre do header. ⚠️ **`multipart/form-data`** (upload de arquivo + campos de formulário juntos).
 
 **Campos do form:**
 - `documento` — arquivo (PDF)
 - `pasta_id` — UUID (form field)
-- `user_id` — UUID (form field)
 - `nome_documento` — string (form field)
 
 Exemplo com `fetch`:
@@ -357,19 +387,22 @@ Exemplo com `fetch`:
 const formData = new FormData();
 formData.append("documento", fileInput.files[0]); // File object
 formData.append("pasta_id", "b1000000-0000-0000-0000-000000000001");
-formData.append("user_id", "3fa85f64-5717-4562-b3fc-2c963f66afa6");
 formData.append("nome_documento", "Capítulo 1 - Introdução");
 
-await fetch("/documentos/upload", { method: "POST", body: formData });
+await fetch("/documentos/upload", {
+  method: "POST",
+  headers: { "X-User-Id": "3fa85f64-5717-4562-b3fc-2c963f66afa6" },
+  body: formData,
+});
 // NÃO defina Content-Type manualmente — o browser define o boundary do multipart automaticamente
 ```
 
 Exemplo `curl`:
 ```bash
 curl -X POST http://localhost:8000/documentos/upload \
+  -H "X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6" \
   -F "documento=@capitulo1.pdf" \
   -F "pasta_id=b1000000-0000-0000-0000-000000000001" \
-  -F "user_id=3fa85f64-5717-4562-b3fc-2c963f66afa6" \
   -F "nome_documento=Capítulo 1 - Introdução"
 ```
 
@@ -400,12 +433,16 @@ Essa URL do S3 é temporária (pré-assinada) — usar direto num `<iframe>`/`<e
 
 ### 3.3 Renomear documento — `PUT /documentos/{documento_id}`
 
-⚠️ **`multipart/form-data`**, igual ao 2.5 (form field `nome`).
+🔒 Auth: `X-User-Id` (header). ⚠️ **`multipart/form-data`**, igual ao 2.5 (form field `nome`).
 
 ```js
 const formData = new FormData();
 formData.append("nome", "Capítulo 1 - Revisado");
-await fetch(`/documentos/${documentoId}`, { method: "PUT", body: formData });
+await fetch(`/documentos/${documentoId}`, {
+  method: "PUT",
+  headers: { "X-User-Id": "3fa85f64-5717-4562-b3fc-2c963f66afa6" },
+  body: formData,
+});
 ```
 
 **Response `200 OK`:** documento atualizado.
@@ -510,7 +547,21 @@ X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 
 ---
 
-### 4.4 Deletar resumo — `DELETE /resumos/{resumo_id}`
+### 4.4 Renomear resumo — `PUT /resumos/{resumo_id}`
+
+🔒 Auth: `X-User-Id` (header).
+
+**Request body** (`ResumoRenomearRequest`):
+```json
+{ "titulo": "Resumo revisado - Capítulo 1" }
+```
+
+**Response `200 OK`** (`ResumoResponse`): mesmo formato do item 4.1, com `titulo` atualizado.
+**Erro:** `404` — `{"detail": "Resumo não encontrado"}`
+
+---
+
+### 4.5 Deletar resumo — `DELETE /resumos/{resumo_id}`
 
 🔒 Auth: `X-User-Id` (header).
 
@@ -587,7 +638,11 @@ X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 
 **Erro:** `404` — `{"detail": "Flashcard não encontrado ou não pertence ao usuário."}`
 
-### 5.4 Deletar flashcard — `DELETE /flashcards/{flashcard_id}`
+### 5.4 Renomear flashcard — `PUT /flashcards/{flashcard_id}`
+
+🔒 Auth: `X-User-Id`. **Body:** `{ "titulo": "Novo título" }`. **Response `200 OK`**: mesmo formato do item 5.1. **Erro:** `404` — `{"detail": "Flashcard não encontrado"}`
+
+### 5.5 Deletar flashcard — `DELETE /flashcards/{flashcard_id}`
 
 🔒 Auth: `X-User-Id`. **Response:** `204 No Content`. **Erro:** `404` — `{"detail": "Flashcard não encontrado"}`
 
@@ -661,7 +716,11 @@ X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 
 **Erro:** `404` — `{"detail": "Quiz não encontrado ou não pertence ao usuário."}`
 
-### 6.4 Deletar quiz — `DELETE /quizzes/{quiz_id}`
+### 6.4 Renomear quiz — `PUT /quizzes/{quiz_id}`
+
+🔒 Auth: `X-User-Id`. **Body:** `{ "titulo": "Novo título" }`. **Response `200 OK`**: mesmo formato do item 6.1. **Erro:** `404` — `{"detail": "Quiz não encontrado"}`
+
+### 6.5 Deletar quiz — `DELETE /quizzes/{quiz_id}`
 
 🔒 Auth: `X-User-Id`. **Response:** `204 No Content`. **Erro:** `404` — `{"detail": "Quiz não encontrado"}`
 
@@ -736,6 +795,16 @@ Mesmo formato do 7.2, mas para questões de quiz — `conteudo` vem como `{ "ite
 
 ---
 
+### 7.3b Todos os cartões (atrasados + em dia) — `GET /revisoes/flashcards/todos`
+
+Mesmo formato do 7.2, mas **sem filtro de `proxima_revisao`** — traz todo o histórico de cartões do usuário (até 500), não só o que venceu. Usado pra montar a lista "em dia" ao lado da lista "atrasados" (a mesma comparação `proxima_revisao <= hoje`, já feita no front pra marcar atraso, separa os dois grupos a partir desta única resposta).
+
+### 7.3c Todas as questões (atrasadas + em dia) — `GET /revisoes/quizzes/todos`
+
+Mesmo formato do 7.3b, para questões de quiz.
+
+---
+
 ### 7.4 Avaliar cartão (flashcard) — `PUT /revisoes/cartoes/{cartao_id}/avaliar`
 
 🔒 Auth: `X-User-Id`. `cartao_id` é o `id` do item retornado no Daily Mix (não é o `flashcard_id` direto — é o `id` da tabela `cartoes`).
@@ -803,5 +872,5 @@ curl -X PUT http://localhost:8000/revisoes/cartoes/g1000000-0000-0000-0000-00000
 
 ---
 
-**Última atualização:** 2026-09-13
-**Fonte:** `app/api/routers/*.py` + `app/schemas/*.py` (lidos diretamente do código nesta data)
+**Última atualização:** 2026-09-22
+**Fonte:** `app/api/routers/*.py` + `app/schemas/*.py` + `app/core/auth_middleware.py` (lidos diretamente do código nesta data)

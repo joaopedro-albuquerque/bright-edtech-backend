@@ -1,7 +1,6 @@
 import os
 import logging
 from uuid import UUID
-from app.schemas.user_schema import PastaBase
 from app.repositories.DocumentRepository import DocumentRepository
 from app.services.S3Service import S3Service
 
@@ -17,10 +16,10 @@ class DocumentGeneratorService:
         self.s3_service = s3_service or S3Service()
         logger.info("DocumentGeneratorService inicializado com sucesso.")
 
-    def criar_pasta_service(self, pasta: PastaBase) -> dict:
-        logger.info(f"Iniciando criação de pasta. Dados: {pasta}")
+    def criar_pasta_service(self, usuario_id: UUID, nome: str, pasta_pai_id: UUID | None) -> dict:
+        logger.info(f"Iniciando criação de pasta '{nome}' para o usuário {usuario_id}.")
         try:
-            resultado = self.document_repo.criar_pasta(pasta)
+            resultado = self.document_repo.criar_pasta(usuario_id, nome, pasta_pai_id)
             logger.info(f"Pasta criada com sucesso. ID: {resultado.get('id')}")
             return resultado
         except Exception as e:
@@ -101,18 +100,18 @@ class DocumentGeneratorService:
             logger.error(f"Erro ao listar todas as pastas do usuário {usuario_id}: {str(e)}", exc_info=True)
             raise RuntimeError("Não foi possível carregar a estrutura de pastas.")
     
-    def listar_conteudo_pasta(self, pasta_id: UUID, limit: int, offset: int) -> dict:
+    def listar_conteudo_pasta(self, pasta_id: UUID, usuario_id: UUID, limit: int, offset: int) -> dict | None:
         logger.info(f"Listando conteúdo da pasta {pasta_id}.")
         try:
-            return self.document_repo.listar_conteudo_pasta(pasta_id, limit, offset)
+            return self.document_repo.listar_conteudo_pasta(pasta_id, usuario_id, limit, offset)
         except Exception as e:
             logger.error(f"Erro ao listar conteúdo da pasta {pasta_id}: {str(e)}", exc_info=True)
             raise RuntimeError("Não foi possível carregar o conteúdo da pasta.")
 
-    def atualizar_pasta_nome(self, pasta_id: UUID, nome: str) -> dict | None:
+    def atualizar_pasta_nome(self, pasta_id: UUID, nome: str, usuario_id: UUID) -> dict | None:
         logger.info(f"Atualizando nome da pasta {pasta_id} para '{nome}'.")
         try:
-            resultado = self.document_repo.atualizar_pasta_nome(pasta_id, nome)
+            resultado = self.document_repo.atualizar_pasta_nome(pasta_id, nome, usuario_id)
             if not resultado:
                 logger.warning(f"Pasta {pasta_id} não encontrada para atualização.")
             else:
@@ -122,10 +121,10 @@ class DocumentGeneratorService:
             logger.error(f"Erro ao renomear pasta {pasta_id}: {str(e)}", exc_info=True)
             raise RuntimeError("Não foi possível renomear a pasta.")
 
-    def atualizar_documento_nome(self, documento_id: UUID, nome: str) -> dict | None:
+    def atualizar_documento_nome(self, documento_id: UUID, nome: str, usuario_id: UUID) -> dict | None:
         logger.info(f"Atualizando nome do documento {documento_id} para '{nome}'.")
         try:
-            resultado = self.document_repo.atualizar_documento_nome(documento_id, nome)
+            resultado = self.document_repo.atualizar_documento_nome(documento_id, nome, usuario_id)
             if not resultado:
                 logger.warning(f"Documento {documento_id} não encontrado para atualização.")
             else:
@@ -148,10 +147,10 @@ class DocumentGeneratorService:
             logger.error(f"Erro ao deletar documento {documento_id}: {str(e)}", exc_info=True)
             raise RuntimeError("Não foi possível excluir o documento.")
 
-    def deletar_pasta(self, pasta_id: UUID) -> bool:
+    def deletar_pasta(self, pasta_id: UUID, usuario_id: UUID) -> bool:
         logger.warning(f"Solicitação de exclusão para a pasta {pasta_id}.")
         try:
-            resultado = self.document_repo.deletar_pasta(pasta_id)
+            resultado = self.document_repo.deletar_pasta(pasta_id, usuario_id)
             if resultado:
                 logger.info(f"Pasta {pasta_id} deletada com sucesso.")
             else:

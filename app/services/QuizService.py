@@ -23,8 +23,8 @@ class QuizService:
         self.s3_service = s3_service or S3Service()
         self.bedrock_service = bedrock_service or BedrockService()
 
-    def gerar_quiz(self, documento_id: UUID, usuario_id: UUID, quantidade: int = 10) -> dict:
-        logger.info(f"Gerando quiz com {quantidade} questões para documento {documento_id}.")
+    def gerar_quiz(self, documento_id: UUID, usuario_id: UUID, quantidade: int = 10, dificuldade: str = "medio") -> dict:
+        logger.info(f"Gerando quiz com {quantidade} questões (dificuldade={dificuldade}) para documento {documento_id}.")
 
         documento = self.document_repo.buscar_chave_s3_por_documento_id_e_usuario(documento_id, usuario_id)
         if not documento or not documento.get("chave_s3"):
@@ -34,7 +34,7 @@ class QuizService:
         texto_extraido = extrair_texto_do_pdf(arquivo_pdf)
 
         questoes_json, tokens_utilizados, modelo_ia = self.bedrock_service.gerar_quiz(
-            texto_extraido, quantidade
+            texto_extraido, quantidade, dificuldade
         )
 
         titulo = "Quiz Gerado"
@@ -77,6 +77,9 @@ class QuizService:
             questoes_enriquecidas.append({**questao, "conteudo": conteudo_item})
 
         return {"id": quiz["id"], "titulo": quiz["titulo"], "questoes": questoes_enriquecidas}
+
+    def renomear_quiz(self, quiz_id: UUID, usuario_id: UUID, titulo: str) -> dict | None:
+        return self.quiz_repo.atualizar_titulo(quiz_id, usuario_id, titulo)
 
     def deletar_quiz(self, quiz_id: UUID, usuario_id: UUID) -> bool:
         return self.quiz_repo.deletar(quiz_id, usuario_id)

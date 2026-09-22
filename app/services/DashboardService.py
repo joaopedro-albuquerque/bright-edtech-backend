@@ -1,7 +1,13 @@
 import logging
 from uuid import UUID
 from app.repositories.DashboardRepository import DashboardRepository
-from app.schemas.dashboard_schema import DashboardResponse, FlashcardItem, ResumoItem, QuizItem
+from app.schemas.dashboard_schema import (
+    DashboardResponse,
+    DocumentoRecenteItem,
+    FlashcardItem,
+    ResumoItem,
+    QuizItem,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +24,7 @@ class DashboardService:
             ultimos_flashcards = self.dashboard_repo.buscar_ultimos_flashcards(usuario_id)
             ultimos_resumos = self.dashboard_repo.buscar_ultimos_resumos(usuario_id)
             ultimos_quizzes = self.dashboard_repo.buscar_ultimos_quizzes(usuario_id)
+            documentos_recentes = self.dashboard_repo.buscar_documentos_recentes(usuario_id)
 
             logger.debug(f"Buscando contadores totais (Usuário: {usuario_id})...")
             total_flashcards = self.dashboard_repo.contar_total_flashcards(usuario_id)
@@ -33,6 +40,7 @@ class DashboardService:
                 ultimos_flashcards=[FlashcardItem(**dict(row)) for row in ultimos_flashcards],
                 ultimos_resumos=[ResumoItem(**dict(row)) for row in ultimos_resumos],
                 ultimos_quizzes=[QuizItem(**dict(row)) for row in ultimos_quizzes],
+                documentos_recentes=[DocumentoRecenteItem(**dict(row)) for row in documentos_recentes],
                 total_flashcards=total_flashcards,
                 total_resumos=total_resumos,
                 total_quizzes=total_quizzes,

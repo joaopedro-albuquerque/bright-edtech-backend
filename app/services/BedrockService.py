@@ -56,6 +56,12 @@ SYSTEM_PROMPTS_RESUMO = {
     ),
 }
 
+_DESCRICAO_DIFICULDADE = {
+    "facil": "Nível de dificuldade: FÁCIL — use definições diretas e recall simples de fatos.",
+    "medio": "Nível de dificuldade: MÉDIO — exija aplicação de conceitos, não só memorização literal.",
+    "dificil": "Nível de dificuldade: DIFÍCIL — exija análise, síntese ou aplicação em casos/cenários novos.",
+}
+
 
 class BedrockService:
     def __init__(self):
@@ -87,11 +93,12 @@ class BedrockService:
         )
         return texto_gerado, tokens_utilizados, modelo_usado
 
-    def gerar_flashcards(self, texto: str, quantidade: int = 10) -> tuple[list, int, str]:
+    def gerar_flashcards(self, texto: str, quantidade: int = 10, dificuldade: str = "medio") -> tuple[list, int, str]:
         system_prompt = (
             f"Você extrai conceitos-chave de um texto e gera exatamente {quantidade} "
-            "flashcards de pergunta/resposta para revisão espaçada. Responda APENAS com "
-            "um JSON válido, sem texto adicional, no formato: "
+            "flashcards de pergunta/resposta para revisão espaçada. "
+            f"{_DESCRICAO_DIFICULDADE.get(dificuldade, _DESCRICAO_DIFICULDADE['medio'])} "
+            "Responda APENAS com um JSON válido, sem texto adicional, no formato: "
             '[{"item_ref": "card_001", "pergunta": "...", "resposta": "..."}, ...]'
         )
 
@@ -103,13 +110,19 @@ class BedrockService:
         )
         return self._parsear_json_lista(resposta), tokens_utilizados, modelo_usado
 
-    def gerar_quiz(self, texto: str, quantidade: int = 10) -> tuple[list, int, str]:
+    def gerar_quiz(self, texto: str, quantidade: int = 10, dificuldade: str = "medio") -> tuple[list, int, str]:
         system_prompt = (
             f"Você extrai conceitos-chave de um texto e gera exatamente {quantidade} "
             "questões de múltipla escolha (4 alternativas) para revisão espaçada. "
+            f"{_DESCRICAO_DIFICULDADE.get(dificuldade, _DESCRICAO_DIFICULDADE['medio'])} "
             "Responda APENAS com um JSON válido, sem texto adicional, no formato: "
-            '[{"item_ref": "q_001", "pergunta": "...", "alternativas": ["a", "b", "c", "d"], '
-            '"resposta_correta": "a"}, ...]'
+            '[{"item_ref": "q_001", "pergunta": "texto da pergunta", '
+            '"alternativas": ["texto completo da alternativa 1", "texto completo da alternativa 2", '
+            '"texto completo da alternativa 3", "texto completo da alternativa 4"], '
+            '"resposta_correta": "texto completo da alternativa correta"}, ...]. '
+            "REGRA OBRIGATÓRIA: o campo resposta_correta deve ser uma cópia EXATA, caractere por "
+            "caractere, de um dos itens do array alternativas — nunca uma letra (a/b/c/d), "
+            "número, índice ou qualquer forma abreviada."
         )
 
         resposta, tokens_utilizados, modelo_usado = self._invocar_modelo(

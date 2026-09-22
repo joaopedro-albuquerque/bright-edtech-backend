@@ -136,6 +136,14 @@ Resources:
               Value: us.anthropic.claude-haiku-4-5-20251001-v1:0
             - Name: GEMINI_MODEL_FALLBACK
               Value: gemini-3.6-flash
+            - Name: COGNITO_USER_POOL_ID
+              Value: us-east-1_0AobHYnIw
+            - Name: COGNITO_CLIENT_ID
+              Value: 25n05802scoi61pnlptah22ij9
+            - Name: COGNITO_REGION
+              Value: us-east-1
+            - Name: REQUIRE_AUTH
+              Value: "true"
           LogConfiguration:
             LogDriver: awslogs
             Options:

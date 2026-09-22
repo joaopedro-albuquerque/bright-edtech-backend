@@ -17,6 +17,10 @@ class ResumoCreateRequest(BaseModel):
     tom: str
 
 
+class ResumoRenomearRequest(BaseModel):
+    titulo: str = Field(..., min_length=1, max_length=255)
+
+
 class ResumoResponse(BaseModel):
     id: UUID
     documento_id: UUID
@@ -25,6 +29,7 @@ class ResumoResponse(BaseModel):
     nivel_conhecimento: int
     tom: str
     s3_chave: str
+    s3_chave_pdf: str | None = None
     tokens_utilizados: int
     modelo_ia: str | None = None
     criado_em: datetime

@@ -61,6 +61,7 @@ CREATE TABLE resumos (
     nivel_conhecimento SMALLINT NOT NULL CHECK (nivel_conhecimento BETWEEN 0 AND 10),
     tom VARCHAR(50) NOT NULL,
     s3_chave VARCHAR(512) NOT NULL,
+    s3_chave_pdf VARCHAR(512), -- PDF gerado a partir do markdown; NULL = ainda não gerado (backfill preguiçoso no download)
     tokens_utilizados INT DEFAULT 0,
     modelo_ia VARCHAR(100),
     criado_em TIMESTAMP NOT NULL DEFAULT now(),

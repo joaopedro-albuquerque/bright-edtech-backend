@@ -35,6 +35,12 @@ class RevisaoService:
     def buscar_quizzes_pendentes(self, usuario_id: UUID) -> list:
         return self._buscar_e_enriquecer(usuario_id, "questoes")
 
+    def buscar_flashcards_todos(self, usuario_id: UUID) -> list:
+        return self._buscar_e_enriquecer(usuario_id, "cartoes", todos=True)
+
+    def buscar_quizzes_todos(self, usuario_id: UUID) -> list:
+        return self._buscar_e_enriquecer(usuario_id, "questoes", todos=True)
+
     def avaliar_cartao(self, cartao_id: UUID, usuario_id: UUID, qualidade: int) -> dict:
         return self._avaliar(cartao_id, usuario_id, qualidade, "cartoes")
 
@@ -42,8 +48,12 @@ class RevisaoService:
         return self._avaliar(questao_id, usuario_id, qualidade, "questoes")
 
     # Helpers
-    def _buscar_e_enriquecer(self, usuario_id: UUID, tabela: str) -> list:
-        pendentes = self.revisao_repo.buscar_pendentes_hoje(usuario_id, tabela)
+    def _buscar_e_enriquecer(self, usuario_id: UUID, tabela: str, todos: bool = False) -> list:
+        pendentes = (
+            self.revisao_repo.buscar_todos(usuario_id, tabela)
+            if todos
+            else self.revisao_repo.buscar_pendentes_hoje(usuario_id, tabela)
+        )
         conteudo_cache: dict[str, list] = {}
         resultado = []
 

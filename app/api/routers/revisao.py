@@ -33,6 +33,22 @@ def buscar_quizzes_pendentes(
     return service.buscar_quizzes_pendentes(usuario_id)
 
 
+@router.get("/flashcards/todos", response_model=list[ItemRevisaoResponse], status_code=status.HTTP_200_OK)
+def buscar_flashcards_todos(
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: RevisaoService = Depends(get_revisao_service),
+) -> list:
+    return service.buscar_flashcards_todos(usuario_id)
+
+
+@router.get("/quizzes/todos", response_model=list[ItemRevisaoResponse], status_code=status.HTTP_200_OK)
+def buscar_quizzes_todos(
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: RevisaoService = Depends(get_revisao_service),
+) -> list:
+    return service.buscar_quizzes_todos(usuario_id)
+
+
 @router.put("/cartoes/{cartao_id}/avaliar", response_model=AvaliarResponse, status_code=status.HTTP_200_OK)
 def avaliar_cartao(
     cartao_id: UUID,

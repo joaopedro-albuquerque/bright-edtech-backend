@@ -36,6 +36,28 @@ class RevisaoRepository:
         except Exception as e:
             raise RuntimeError(f"Erro no banco de dados ao buscar pendentes em '{tabela}': {e}")
 
+    def buscar_todos(self, usuario_id: UUID, tabela: str, limit: int = 500) -> list:
+        """Mesma consulta de buscar_pendentes_hoje, sem o filtro de data — usada
+        pra listar TODOS os itens do usuário (atrasados + em dia), não só os vencidos."""
+        _validar_tabela(tabela)
+        origem_fk = TABELAS_PERMITIDAS[tabela]["origem_fk"]
+        tabela_origem = TABELAS_PERMITIDAS[tabela]["tabela_origem"]
+        try:
+            with self.conn.cursor() as cursor:
+                query = f"""
+                    SELECT r.id, r.{origem_fk} AS origem_id, r.item_ref, r.fator_facilidade,
+                           r.intervalo_atual, r.repeticoes, r.proxima_revisao, o.s3_chave
+                    FROM {tabela} r
+                    JOIN {tabela_origem} o ON o.id = r.{origem_fk}
+                    WHERE r.usuario_id = %s
+                    ORDER BY r.proxima_revisao ASC
+                    LIMIT %s;
+                """
+                cursor.execute(query, (usuario_id, limit))
+                return cursor.fetchall()
+        except Exception as e:
+            raise RuntimeError(f"Erro no banco de dados ao buscar todos os itens em '{tabela}': {e}")
+
     def buscar_por_id(self, item_id: UUID, usuario_id: UUID, tabela: str) -> dict | None:
         _validar_tabela(tabela)
         try:

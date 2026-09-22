@@ -4,7 +4,7 @@ from xhtml2pdf import pisa
 from pathlib import Path
 from pypdf import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
-from reportlab.lib.colors import Color
+from reportlab.lib.colors import HexColor # Adicionado para garantir a cor opaca correta
 
 # Configuração de caminhos
 CAMINHO_BASE = Path(__file__).resolve().parent.parent 
@@ -51,15 +51,11 @@ hr {{ border: none; border-top: 1px solid #cbd5e0; margin: 16px 0; }}
 """
 
 def aplicar_marcacao_dagua(pdf_bytes: bytes) -> bytes:
-    """
-    Abordagem alterada: recebe o PDF já renderizado pelo xhtml2pdf (em bytes)
-    e carimba de forma nativa a marca d'água perfeitamente rotacionada e vazada.
-    """
     reader = PdfReader(io.BytesIO(pdf_bytes))
     writer = PdfWriter()
     
-    # Tom de azul da Bright EdTech com 30% de opacidade
-    blue_color = Color(0.12, 0.35, 0.65, alpha=0.3)
+    # Cor sólida e preenchida (sem opacidade que atrapalhe a leitura)
+    fill_color = HexColor("#E2E5F0")
     
     for page_num in range(len(reader.pages)):
         page = reader.pages[page_num]
@@ -72,22 +68,23 @@ def aplicar_marcacao_dagua(pdf_bytes: bytes) -> bytes:
         
         # Posicionamento inicial para rotacionar
         c.translate(width / 2, height / 2)
-        c.rotate(45) # Diagonal idêntica ao modelo
+        c.rotate(45) 
         
-        c.setStrokeColor(blue_color)
-        c.setLineWidth(2.5) # Espessura do contorno vazado
+        # SUBSTITUIÇÃO 1: Definir cor de preenchimento (Fill) em vez de contorno (Stroke)
+        c.setFillColor(fill_color)
         
         # Lógica da malha da marca d'água
         span = int(max(width, height) * 1.5)
-        step_x = 650 # Distância horizontal entre as frases
-        step_y = 250 # Distância vertical entre as frases
+        step_x = 650 
+        step_y = 250 
         
         for row, y in enumerate(range(-span, span, step_y)):
             offset_x = (step_x / 2) if row % 2 != 0 else 0
             for x in range(-span, span, step_x):
-                t = c.beginText(x + offset_x - 300, y) # Centralização bruta
+                t = c.beginText(x + offset_x - 300, y) 
                 t.setFont("Helvetica-Bold", 70)
-                t.setTextRenderMode(1) # MODO 1 = Texto vazado (Outline stroke)
+                # SUBSTITUIÇÃO 2: MODO 0 = Texto Preenchido (Fill text)
+                t.setTextRenderMode(0) 
                 t.textOut("BRIGHT EDTECH")
                 c.drawText(t)
                 
@@ -97,9 +94,11 @@ def aplicar_marcacao_dagua(pdf_bytes: bytes) -> bytes:
         # Funde a camada gerada com a página existente
         watermark_pdf = PdfReader(packet)
         watermark_page = watermark_pdf.pages[0]
-        page.merge_page(watermark_page)
         
-        writer.add_page(page)
+        # SUBSTITUIÇÃO 3: Coloca o texto principal (page) POR CIMA da marca d'água (watermark_page)
+        watermark_page.merge_page(page)
+        
+        writer.add_page(watermark_page)
 
     output_buffer = io.BytesIO()
     writer.write(output_buffer)

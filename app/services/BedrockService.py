@@ -116,8 +116,13 @@ class BedrockService:
             "questões de múltipla escolha (4 alternativas) para revisão espaçada. "
             f"{_DESCRICAO_DIFICULDADE.get(dificuldade, _DESCRICAO_DIFICULDADE['medio'])} "
             "Responda APENAS com um JSON válido, sem texto adicional, no formato: "
-            '[{"item_ref": "q_001", "pergunta": "...", "alternativas": ["a", "b", "c", "d"], '
-            '"resposta_correta": "a"}, ...]'
+            '[{"item_ref": "q_001", "pergunta": "texto da pergunta", '
+            '"alternativas": ["texto completo da alternativa 1", "texto completo da alternativa 2", '
+            '"texto completo da alternativa 3", "texto completo da alternativa 4"], '
+            '"resposta_correta": "texto completo da alternativa correta"}, ...]. '
+            "REGRA OBRIGATÓRIA: o campo resposta_correta deve ser uma cópia EXATA, caractere por "
+            "caractere, de um dos itens do array alternativas — nunca uma letra (a/b/c/d), "
+            "número, índice ou qualquer forma abreviada."
         )
 
         resposta, tokens_utilizados, modelo_usado = self._invocar_modelo(

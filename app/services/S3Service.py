@@ -61,6 +61,19 @@ class S3Service:
 
         return {"bucket": self.bucket_name, "key": key, "s3_url": f"s3://{self.bucket_name}/{key}"}
 
+    def upload_bytes(self, content: bytes, key: str, content_type: str) -> dict:
+        try:
+            self.client.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=content,
+                ContentType=content_type,
+            )
+        except (BotoCoreError, ClientError) as exc:
+            raise RuntimeError(f"Falha ao enviar arquivo binário para S3: {exc}") from exc
+
+        return {"bucket": self.bucket_name, "key": key, "s3_url": f"s3://{self.bucket_name}/{key}"}
+
     def upload_json(self, data, key: str) -> dict:
         return self.upload_text(json.dumps(data, ensure_ascii=False, indent=2), key, content_type="application/json")
 

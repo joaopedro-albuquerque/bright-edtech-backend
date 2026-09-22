@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class FlashcardCreateRequest(BaseModel):
     quantidade: int = Field(10, ge=1, le=50)
+    dificuldade: str = Field("medio", pattern="^(facil|medio|dificil)$")
 
 
 class FlashcardRenomearRequest(BaseModel):

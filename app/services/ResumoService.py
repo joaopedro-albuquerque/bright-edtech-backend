@@ -5,6 +5,7 @@ from app.repositories.DocumentRepository import DocumentRepository
 from app.repositories.ResumoRepository import ResumoRepository
 from app.services.BedrockService import BedrockService
 from app.services.S3Service import S3Service
+from app.services.pdf_generator import gerar_pdf_de_markdown
 from app.services.pdf_utils import extrair_texto_do_pdf
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,14 @@ class ResumoService:
         s3_chave = f"artifacts/{usuario_id}/{documento_id}/resumo-{formato}.md"
         self.s3_service.upload_text(texto_gerado, s3_chave)
 
+        s3_chave_pdf = f"artifacts/{usuario_id}/{documento_id}/resumo-{formato}.pdf"
+        try:
+            pdf_bytes = gerar_pdf_de_markdown(texto_gerado, titulo)
+            self.s3_service.upload_bytes(pdf_bytes, s3_chave_pdf, content_type="application/pdf")
+        except Exception:
+            logger.warning(f"Falha ao gerar PDF do resumo (documento {documento_id}).", exc_info=True)
+            s3_chave_pdf = None
+
         return self.resumo_repo.criar(
             documento_id=documento_id,
             usuario_id=usuario_id,
@@ -53,6 +62,7 @@ class ResumoService:
             s3_chave=s3_chave,
             tokens_utilizados=tokens_utilizados,
             modelo_ia=modelo_ia,
+            s3_chave_pdf=s3_chave_pdf,
         )
 
     def listar_por_documento(self, documento_id: UUID, usuario_id: UUID) -> list:
@@ -65,6 +75,21 @@ class ResumoService:
 
         texto = self.s3_service.download_text(resumo["s3_chave"])
         return {"id": resumo["id"], "titulo": resumo["titulo"], "conteudo": texto}
+
+    def obter_download_url(self, resumo_id: UUID, usuario_id: UUID) -> str:
+        resumo = self.resumo_repo.buscar_por_id(resumo_id, usuario_id)
+        if not resumo:
+            raise ValueError("Resumo não encontrado ou não pertence ao usuário.")
+
+        s3_chave_pdf = resumo.get("s3_chave_pdf")
+        if not s3_chave_pdf:
+            texto_markdown = self.s3_service.download_text(resumo["s3_chave"])
+            pdf_bytes = gerar_pdf_de_markdown(texto_markdown, resumo["titulo"])
+            s3_chave_pdf = f"artifacts/{usuario_id}/{resumo['documento_id']}/resumo-{resumo['formato']}.pdf"
+            self.s3_service.upload_bytes(pdf_bytes, s3_chave_pdf, content_type="application/pdf")
+            self.resumo_repo.atualizar_s3_chave_pdf(resumo_id, usuario_id, s3_chave_pdf)
+
+        return self.s3_service.generate_presigned_url(s3_chave_pdf)
 
     def renomear_resumo(self, resumo_id: UUID, usuario_id: UUID, titulo: str) -> dict | None:
         return self.resumo_repo.atualizar_titulo(resumo_id, usuario_id, titulo)

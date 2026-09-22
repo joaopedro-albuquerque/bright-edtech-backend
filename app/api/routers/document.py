@@ -218,6 +218,21 @@ def obter_conteudo_resumo(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 
 
+@resumos_router.get("/{resumo_id}/download", status_code=status.HTTP_200_OK)
+def obter_download_pdf_resumo(
+    resumo_id: UUID,
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: ResumoService = Depends(get_resumo_service),
+) -> dict:
+    try:
+        url = service.obter_download_url(resumo_id, usuario_id)
+        return {"url": url}
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+
+
 @resumos_router.put("/{resumo_id}", response_model=ResumoResponse, status_code=status.HTTP_200_OK)
 def renomear_resumo(
     resumo_id: UUID,
@@ -256,7 +271,7 @@ def gerar_flashcards(
     service: FlashcardService = Depends(get_flashcard_service),
 ):
     try:
-        return service.gerar_flashcards(documento_id, usuario_id, payload.quantidade)
+        return service.gerar_flashcards(documento_id, usuario_id, payload.quantidade, payload.dificuldade)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 
@@ -324,7 +339,7 @@ def gerar_quiz(
     service: QuizService = Depends(get_quiz_service),
 ):
     try:
-        return service.gerar_quiz(documento_id, usuario_id, payload.quantidade)
+        return service.gerar_quiz(documento_id, usuario_id, payload.quantidade, payload.dificuldade)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 

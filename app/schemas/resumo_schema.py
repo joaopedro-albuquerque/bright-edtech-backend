@@ -29,6 +29,7 @@ class ResumoResponse(BaseModel):
     nivel_conhecimento: int
     tom: str
     s3_chave: str
+    s3_chave_pdf: str | None = None
     tokens_utilizados: int
     modelo_ia: str | None = None
     criado_em: datetime

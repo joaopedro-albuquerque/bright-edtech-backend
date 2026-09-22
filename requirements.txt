@@ -8,3 +8,5 @@ python-multipart
 PyPDF2
 PyJWT[crypto]>=2.8,<3
 google-genai
+markdown
+xhtml2pdf

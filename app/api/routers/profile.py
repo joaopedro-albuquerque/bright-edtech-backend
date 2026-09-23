@@ -47,6 +47,35 @@ def buscar_usuario_por_cognito_id(
         )
         
     return usuario
+    
+@router.put("", response_model=Usuario, status_code=status.HTTP_200_OK)
+def atualizar_meu_perfil(
+    request: Request,
+    usuario_update: UsuarioBase,
+    service: ProfileService = Depends(get_profile_service)
+) -> Usuario:
+    # 1. Extrai o ID do Cognito diretamente do token validado no request
+    cognito_id = extrair_cognito_id(request)
+    
+    # 2. Busca o utilizador atual na base de dados para descobrir o seu UUID interno
+    usuario_atual = service.buscar_usuario_por_cognito_id(cognito_id)
+    
+    if not usuario_atual:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Usuário não encontrado no banco de dados."
+        )
+        
+    # 3. Atualiza o perfil usando o ID interno verdadeiro (usuario_atual.id)
+    usuario_atualizado = service.atualizar_usuario_por_id(usuario_atual.id, usuario_update)
+    
+    if not usuario_atualizado:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Erro ao atualizar o usuário."
+        )
+        
+    return usuario_atualizado    
 
 def _garantir_dono(user_id: UUID, usuario_id: UUID) -> None:
     if usuario_id != user_id:

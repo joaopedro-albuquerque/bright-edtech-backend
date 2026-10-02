@@ -9,19 +9,21 @@ class ProfileRepository:
         try:
             with self.conn.cursor() as cursor:
                 query = """
-                    INSERT INTO usuarios 
-                    (email, nome, estilo_preferido, formato_preferido, objetivos_estudo, cognito_id)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    INSERT INTO usuarios
+                    (email, nome, estilo_preferido, formato_preferido, objetivos_estudo, cognito_id,
+                     termos_versao, termos_aceitos_em)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, now())
                     RETURNING *;
                 """
-                
+
                 cursor.execute(query, (
                     usuario.email,
                     usuario.nome,
                     usuario.estilo_preferido,
                     usuario.formato_preferido,
                     usuario.objetivos_estudo,
-                    usuario.cognito_id 
+                    usuario.cognito_id,
+                    usuario.termos_versao,
                 ))
                 
                 row = cursor.fetchone()

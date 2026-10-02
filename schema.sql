@@ -16,6 +16,8 @@ CREATE TABLE usuarios (
     estilo_preferido VARCHAR(50),
     formato_preferido VARCHAR(50),
     objetivos_estudo TEXT,
+    termos_aceitos_em TIMESTAMP,
+    termos_versao VARCHAR(20),
     criado_em TIMESTAMP NOT NULL DEFAULT now(),
     atualizado_em TIMESTAMP NOT NULL DEFAULT now()
 );

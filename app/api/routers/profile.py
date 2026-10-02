@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from uuid import UUID
 
 from app.api.dependencies import get_current_user_id, get_profile_service, get_dashboard_service
+from app.core.config import TERMOS_DE_USO_VERSAO
 from app.services.ProfileService import ProfileService
 from app.services.DashboardService import DashboardService
 from app.schemas.user_schema import OnboardingRequest, Usuario, UsuarioBase
@@ -29,6 +30,11 @@ def criar_usuario(
     usuario: UsuarioBase,
     service: ProfileService = Depends(get_profile_service)
 ) -> Usuario:
+    if usuario.termos_versao != TERMOS_DE_USO_VERSAO:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="É necessário aceitar a versão vigente dos Termos de Uso e da Política de Privacidade para concluir o cadastro.",
+        )
     return service.criar_usuario(usuario)
 
 @router.get("", response_model=Usuario, status_code=status.HTTP_200_OK)

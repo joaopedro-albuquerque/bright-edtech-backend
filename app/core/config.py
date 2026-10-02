@@ -1,5 +1,12 @@
 import os
 
+# Versão atual do Termo de Uso / Consentimento LGPD exibido no cadastro.
+# Ao editar o texto do termo no front (rota /termos), incrementar este valor
+# para forçar novos aceites de quem ainda não cadastrou — usuários já
+# cadastrados não são afetados (não há gate retroativo, por decisão de
+# produto registrada na feature de consentimento LGPD).
+TERMOS_DE_USO_VERSAO = "1.0"
+
 
 class Settings:
     aws_region: str = os.getenv("AWS_REGION", "us-east-1")

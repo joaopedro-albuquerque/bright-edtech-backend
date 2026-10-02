@@ -24,15 +24,20 @@ class OnboardingRequest(BaseModel):
 
 
 class UsuarioBase(BaseModel):
-    email: EmailStr  
+    email: EmailStr
     nome: str | None = None
     estilo_preferido: str | None = None
     formato_preferido: str | None = None
     objetivos_estudo: str | None = None
     cognito_id: str | None = None
+    termos_versao: str | None = None
+    """Versão do Termo de Uso/Consentimento LGPD aceita no cadastro (ver
+    app/core/constants.py::TERMOS_DE_USO_VERSAO). Só é exigido na criação
+    (POST /profile); ignorado em edições (PUT /profile/{id})."""
 
 class Usuario(UsuarioBase):
     id: UUID
+    termos_aceitos_em: datetime | None = None
     criado_em: datetime
     atualizado_em: datetime
 

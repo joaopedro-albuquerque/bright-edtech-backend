@@ -18,6 +18,7 @@ CREATE TABLE usuarios (
     objetivos_estudo TEXT,
     termos_aceitos_em TIMESTAMP,
     termos_versao VARCHAR(20),
+    tour_concluido BOOLEAN NOT NULL DEFAULT false,
     criado_em TIMESTAMP NOT NULL DEFAULT now(),
     atualizado_em TIMESTAMP NOT NULL DEFAULT now()
 );

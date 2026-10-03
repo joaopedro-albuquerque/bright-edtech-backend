@@ -34,6 +34,10 @@ class UsuarioBase(BaseModel):
     """Versão do Termo de Uso/Consentimento LGPD aceita no cadastro (ver
     app/core/constants.py::TERMOS_DE_USO_VERSAO). Só é exigido na criação
     (POST /profile); ignorado em edições (PUT /profile/{id})."""
+    tour_concluido: bool | None = None
+    """Se None em um PUT, o valor atual no banco é preservado (ver
+    ProfileRepository.atualizar_usuario_por_id) -- só sobrescreve quando
+    o cliente manda True/False explicitamente."""
 
 class Usuario(UsuarioBase):
     id: UUID

@@ -48,6 +48,7 @@ class ProfileRepository:
                         estilo_preferido = %s,
                         formato_preferido = %s,
                         objetivos_estudo = %s,
+                        tour_concluido = COALESCE(%s, tour_concluido),
                         atualizado_em = now()
                     WHERE id = %s
                     RETURNING *;
@@ -59,6 +60,7 @@ class ProfileRepository:
                     usuario.estilo_preferido,
                     usuario.formato_preferido,
                     usuario.objetivos_estudo,
+                    usuario.tour_concluido,
                     user_id
                 ))
 

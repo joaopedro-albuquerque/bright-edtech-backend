@@ -68,6 +68,10 @@ htmlcov/
 .coverage.*
 coverage.xml
 
+# Allure
+allure-results/
+allure-report/
+
 # Optional: ignore .env files used locally
 .env
 

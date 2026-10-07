@@ -5,3 +5,4 @@ pytest-cov
 pytest-asyncio
 pytest-html
 pytest-mock==3.16.0
+allure-pytest==2.16.2

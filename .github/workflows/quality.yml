@@ -42,6 +42,20 @@ jobs:
             report.html
           if-no-files-found: warn
 
+      - name: Gerar relatório Allure
+        if: ${{ !cancelled() }}
+        run: |
+          npm install -g allure-commandline --silent
+          allure generate allure-results -o allure-report --clean
+
+      - name: Publicar relatório Allure
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: allure-report/
+          if-no-files-found: warn
+
       - name: Resumo da cobertura
         if: ${{ !cancelled() }}
         run: |

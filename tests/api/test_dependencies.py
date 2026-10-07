@@ -6,6 +6,20 @@ from fastapi import HTTPException
 from app.api import dependencies
 
 
+@pytest.fixture(autouse=True)
+def _mock_infra_services(mocker):
+    """Isola os testes de DI da construção real de S3Service/BedrockService,
+    que dependem de variáveis de ambiente (S3_BUCKET_NAME) inexistentes em CI."""
+    mocker.patch("app.services.DocumentGeneratorService.S3Service")
+    mocker.patch("app.services.ResumoService.S3Service")
+    mocker.patch("app.services.ResumoService.BedrockService")
+    mocker.patch("app.services.FlashcardService.S3Service")
+    mocker.patch("app.services.FlashcardService.BedrockService")
+    mocker.patch("app.services.QuizService.S3Service")
+    mocker.patch("app.services.QuizService.BedrockService")
+    mocker.patch("app.services.RevisaoService.S3Service")
+
+
 class TestGetDb:
     def test_get_db_entrega_conexao_e_fecha_no_final(self, mocker):
         mock_conn = mocker.MagicMock()

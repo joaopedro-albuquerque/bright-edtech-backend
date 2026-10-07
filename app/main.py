@@ -1,7 +1,20 @@
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.middlewares.request_id_middleware import RequestIdMiddleware
 from app.core.auth_middleware import AuthMiddleware
+from app.core.exception_handlers import (
+    app_exception_handler,
+    request_validation_error_handler,
+    unhandled_exception_handler,
+    validation_notification_handler,
+)
+from app.core.exceptions import AppException, ValidationNotificationError
+from app.core.logging_config import configurar_logging
+
+configurar_logging()
+
 from app.api.routers.profile import router as profile_router
 from app.api.routers.document import (
     pastas_router,
@@ -35,10 +48,6 @@ origins = [
     "http://127.0.0.1:5173",
 ]
 
-# AuthMiddleware precisa ser registrado ANTES do CORSMiddleware: no Starlette,
-# o último middleware adicionado é o mais externo. Mantendo o CORS por fora,
-# ele consegue anexar os headers de CORS mesmo nas respostas 401 do AuthMiddleware
-# (senão o browser reportaria "erro de CORS" em vez de 401 não autorizado).
 app.add_middleware(AuthMiddleware)
 
 app.add_middleware(
@@ -48,6 +57,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(RequestIdMiddleware)
+
+app.add_exception_handler(ValidationNotificationError, validation_notification_handler)
+app.add_exception_handler(AppException, app_exception_handler)
+app.add_exception_handler(RequestValidationError, request_validation_error_handler)
+app.add_exception_handler(Exception, unhandled_exception_handler)
 
 app.include_router(profile_router)
 app.include_router(pastas_router)

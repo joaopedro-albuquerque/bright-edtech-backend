@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
 from app.api.dependencies import get_current_user_id, get_revisao_service
 from app.schemas.revisao_schema import AvaliarRequest, AvaliarResponse, DailyMixResponse, ItemRevisaoResponse
@@ -56,10 +56,7 @@ def avaliar_cartao(
     usuario_id: UUID = Depends(get_current_user_id),
     service: RevisaoService = Depends(get_revisao_service),
 ):
-    try:
-        return service.avaliar_cartao(cartao_id, usuario_id, payload.qualidade)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return service.avaliar_cartao(cartao_id, usuario_id, payload.qualidade)
 
 
 @router.put("/questoes/{questao_id}/avaliar", response_model=AvaliarResponse, status_code=status.HTTP_200_OK)
@@ -69,7 +66,4 @@ def avaliar_questao(
     usuario_id: UUID = Depends(get_current_user_id),
     service: RevisaoService = Depends(get_revisao_service),
 ):
-    try:
-        return service.avaliar_questao(questao_id, usuario_id, payload.qualidade)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return service.avaliar_questao(questao_id, usuario_id, payload.qualidade)

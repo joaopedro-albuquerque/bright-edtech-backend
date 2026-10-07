@@ -1,6 +1,7 @@
 from uuid import UUID, uuid4
-# import logging
-# logger = logging.getLogger(__name__)
+
+from app.core.exceptions import DocumentDatabaseError
+
 
 class DocumentRepository:
     def __init__(self, conn):
@@ -17,14 +18,14 @@ class DocumentRepository:
                 cursor.execute(query, (usuario_id, nome, pasta_pai_id))
                 row = cursor.fetchone()
                 self.conn.commit()
-                
+
                 if not row:
-                    raise RuntimeError("A query executou, mas o RETURNING não devolveu os dados.")
-                    
+                    raise DocumentDatabaseError("A query executou, mas o RETURNING não devolveu os dados.")
+
                 return dict(row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao criar pasta: {e}")
+            raise DocumentDatabaseError("Erro no banco de dados ao criar pasta.") from e
 
     def criar_documento(
         self,
@@ -50,15 +51,15 @@ class DocumentRepository:
                     (usuario_id, pasta_id, nome, placeholder, nivel_conhecimento)
                 )
                 row = cursor.fetchone()
-                
+
                 if not row:
-                    raise RuntimeError("INSERT executado, mas RETURNING falhou.")
+                    raise DocumentDatabaseError("INSERT executado, mas RETURNING falhou.")
 
                 self.conn.commit()
                 return dict(row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao criar documento: {e}")
+            raise DocumentDatabaseError("Erro no banco de dados ao criar documento.") from e
 
     def atualizar_chave_s3(self, documento_id: UUID, chave_s3: str) -> dict:
         try:
@@ -72,15 +73,15 @@ class DocumentRepository:
                 """
                 cursor.execute(update_query, (chave_s3, documento_id))
                 row = cursor.fetchone()
-                
+
                 if not row:
-                    raise RuntimeError(f"Nenhum documento encontrado para atualizar com id {documento_id}.")
+                    raise DocumentDatabaseError(f"Nenhum documento encontrado para atualizar com id {documento_id}.")
 
                 self.conn.commit()
                 return dict(row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao atualizar chave S3: {e}")
+            raise DocumentDatabaseError("Erro no banco de dados ao atualizar chave S3.") from e
 
     def buscar_chave_s3_por_documento_id_e_usuario(self, documento_id: UUID, usuario_id: UUID) -> dict | None:
         try:
@@ -94,13 +95,13 @@ class DocumentRepository:
                 cursor.execute(query, (documento_id, usuario_id))
                 return cursor.fetchone()
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao buscar chave S3: {e}")
-        
+            raise DocumentDatabaseError("Erro no banco de dados ao buscar chave S3.") from e
+
     def listar_pastas_raiz_por_usuario(self, usuario_id: UUID, limit: int, offset: int) -> list:
         try:
             with self.conn.cursor() as cursor:
                 query = """
-                    SELECT * FROM pastas 
+                    SELECT * FROM pastas
                     WHERE usuario_id = %s AND pasta_pai_id IS NULL
                     ORDER BY criada_em DESC
                     LIMIT %s OFFSET %s;
@@ -108,7 +109,7 @@ class DocumentRepository:
                 cursor.execute(query, (usuario_id, limit, offset))
                 return cursor.fetchall()
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao listar pastas raiz: {e}")
+            raise DocumentDatabaseError("Erro no banco de dados ao listar pastas raiz.") from e
 
     def listar_todas_pastas_por_usuario(self, usuario_id: UUID) -> list:
         try:
@@ -122,41 +123,37 @@ class DocumentRepository:
                 cursor.execute(query, (usuario_id,))
                 return cursor.fetchall()
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao listar todas as pastas: {e}")
-    
+            raise DocumentDatabaseError("Erro no banco de dados ao listar todas as pastas.") from e
+
     def listar_conteudo_pasta(self, pasta_id: UUID, usuario_id: UUID, limit: int, offset: int) -> dict | None:
         try:
             with self.conn.cursor() as cursor:
-                # 0. Garante que a pasta pertence ao usuário antes de listar
                 cursor.execute("SELECT 1 FROM pastas WHERE id = %s AND usuario_id = %s;", (pasta_id, usuario_id))
                 if not cursor.fetchone():
                     return None
 
-                # 1. Buscar subpastas imediatas
                 query_subpastas = """
-                    SELECT id, nome, criada_em 
-                    FROM pastas 
-                    WHERE pasta_pai_id = %s 
+                    SELECT id, nome, criada_em
+                    FROM pastas
+                    WHERE pasta_pai_id = %s
                     ORDER BY nome ASC;
                 """
                 cursor.execute(query_subpastas, (pasta_id,))
                 subpastas = cursor.fetchall()
 
-                # 2. Buscar documentos com paginação
                 query_documentos = """
-                SELECT id, nome, status, resumo  
-                FROM documentos 
-                WHERE pasta_id = %s 
-                ORDER BY criado_em DESC 
+                SELECT id, nome, status, resumo
+                FROM documentos
+                WHERE pasta_id = %s
+                ORDER BY criado_em DESC
                 LIMIT %s OFFSET %s;
                 """
                 cursor.execute(query_documentos, (pasta_id, limit, offset))
                 arquivos = cursor.fetchall()
 
-                # 3. Contar total de documentos
                 query_count = """
-                    SELECT count(*) as total 
-                    FROM documentos 
+                    SELECT count(*) as total
+                    FROM documentos
                     WHERE pasta_id = %s;
                 """
                 cursor.execute(query_count, (pasta_id,))
@@ -170,7 +167,7 @@ class DocumentRepository:
                     "tem_mais_paginas": (offset + limit) < total_arquivos
                 }
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao listar conteúdo da pasta: {e}")
+            raise DocumentDatabaseError("Erro no banco de dados ao listar conteúdo da pasta.") from e
 
     def atualizar_pasta_nome(self, pasta_id: UUID, nome: str, usuario_id: UUID) -> dict | None:
         try:
@@ -181,16 +178,16 @@ class DocumentRepository:
                     (nome, pasta_id, usuario_id)
                 )
                 row = cursor.fetchone()
-                
+
                 if not row:
                     self.conn.rollback()
                     return None
-                    
+
                 self.conn.commit()
                 return dict(row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao atualizar nome da pasta: {e}")
+            raise DocumentDatabaseError("Erro no banco de dados ao atualizar nome da pasta.") from e
 
     def deletar_pasta(self, pasta_id: UUID, usuario_id: UUID) -> bool:
         try:
@@ -204,8 +201,8 @@ class DocumentRepository:
                 return deleted
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao deletar pasta: {e}")
-    
+            raise DocumentDatabaseError("Erro no banco de dados ao deletar pasta.") from e
+
     def inserir_documento(
         self, usuario_id: UUID, pasta_id: UUID, nome: str, chave_s3: str, resumo: str
     ) -> dict:
@@ -218,17 +215,17 @@ class DocumentRepository:
                 """
                 valores = (usuario_id, pasta_id, nome, chave_s3, 'basico', 'concluido', resumo)
                 cursor.execute(query, valores)
-                
+
                 row = cursor.fetchone()
                 if not row:
-                    raise RuntimeError("Falha ao retornar os dados inseridos (RETURNING vazio).")
-                    
+                    raise DocumentDatabaseError("Falha ao retornar os dados inseridos (RETURNING vazio).")
+
                 self.conn.commit()
                 return dict(row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao inserir documento processado: {e}")
-        
+            raise DocumentDatabaseError("Erro no banco de dados ao inserir documento processado.") from e
+
     def atualizar_documento_nome(self, documento_id: UUID, nome: str, usuario_id: UUID) -> dict | None:
         try:
             with self.conn.cursor() as cursor:
@@ -249,7 +246,7 @@ class DocumentRepository:
                 return dict(row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao atualizar nome do documento: {e}")
+            raise DocumentDatabaseError("Erro no banco de dados ao atualizar nome do documento.") from e
 
     def deletar_documento(self, documento_id: UUID, usuario_id: UUID) -> bool:
         try:
@@ -263,4 +260,4 @@ class DocumentRepository:
                 return deleted
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao deletar documento: {e}")
+            raise DocumentDatabaseError("Erro no banco de dados ao deletar documento.") from e

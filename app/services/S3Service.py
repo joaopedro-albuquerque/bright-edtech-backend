@@ -4,6 +4,8 @@ import io
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
+from app.core.exceptions import StorageError
+
 
 class S3Service:
     def __init__(self, bucket_name: str | None = None):
@@ -23,7 +25,7 @@ class S3Service:
         try:
             self.client.upload_fileobj(file_obj, self.bucket_name, key)
         except (BotoCoreError, ClientError) as exc:
-            raise RuntimeError(f"Falha no upload para S3: {exc}") from exc
+            raise StorageError("Falha no upload para S3.") from exc
 
         return {
             "bucket": self.bucket_name,
@@ -39,14 +41,14 @@ class S3Service:
                 ExpiresIn=expiration
             )
         except (BotoCoreError, ClientError) as exc:
-            raise RuntimeError(f"Falha ao gerar URL pré-assinada para S3: {exc}") from exc
+            raise StorageError("Falha ao gerar URL pré-assinada para S3.") from exc
         
     def download_file(self, key: str) -> io.BytesIO:
         try:
             response = self.client.get_object(Bucket=self.bucket_name, Key=key)
             return io.BytesIO(response['Body'].read())
         except (BotoCoreError, ClientError) as exc:
-            raise RuntimeError(f"Falha ao baixar arquivo do S3: {exc}") from exc
+            raise StorageError("Falha ao baixar arquivo do S3.") from exc
 
     def upload_text(self, content: str, key: str, content_type: str = "text/markdown") -> dict:
         try:
@@ -57,7 +59,7 @@ class S3Service:
                 ContentType=content_type,
             )
         except (BotoCoreError, ClientError) as exc:
-            raise RuntimeError(f"Falha ao enviar texto para S3: {exc}") from exc
+            raise StorageError("Falha ao enviar texto para S3.") from exc
 
         return {"bucket": self.bucket_name, "key": key, "s3_url": f"s3://{self.bucket_name}/{key}"}
 
@@ -70,7 +72,7 @@ class S3Service:
                 ContentType=content_type,
             )
         except (BotoCoreError, ClientError) as exc:
-            raise RuntimeError(f"Falha ao enviar arquivo binário para S3: {exc}") from exc
+            raise StorageError("Falha ao enviar arquivo binário para S3.") from exc
 
         return {"bucket": self.bucket_name, "key": key, "s3_url": f"s3://{self.bucket_name}/{key}"}
 
@@ -82,11 +84,11 @@ class S3Service:
             response = self.client.get_object(Bucket=self.bucket_name, Key=key)
             return json.loads(response["Body"].read())
         except (BotoCoreError, ClientError) as exc:
-            raise RuntimeError(f"Falha ao baixar JSON do S3: {exc}") from exc
+            raise StorageError("Falha ao baixar JSON do S3.") from exc
 
     def download_text(self, key: str) -> str:
         try:
             response = self.client.get_object(Bucket=self.bucket_name, Key=key)
             return response["Body"].read().decode("utf-8")
         except (BotoCoreError, ClientError) as exc:
-            raise RuntimeError(f"Falha ao baixar texto do S3: {exc}") from exc
+            raise StorageError("Falha ao baixar texto do S3.") from exc

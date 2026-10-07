@@ -1,6 +1,7 @@
 import logging
 from uuid import UUID
 
+from app.core.exceptions import RevisaoNotFoundError
 from app.repositories.RevisaoRepository import RevisaoRepository
 from app.services.S3Service import S3Service
 from app.services.SpacedRepetitionService import SpacedRepetitionService
@@ -86,7 +87,7 @@ class RevisaoService:
     def _avaliar(self, item_id: UUID, usuario_id: UUID, qualidade: int, tabela: str) -> dict:
         item_atual = self.revisao_repo.buscar_por_id(item_id, usuario_id, tabela)
         if not item_atual:
-            raise ValueError("Item de revisão não encontrado.")
+            raise RevisaoNotFoundError("Item de revisão não encontrado.")
 
         novo_estado = self.spaced_repetition.avaliar(
             fator_facilidade=item_atual["fator_facilidade"],
@@ -106,6 +107,6 @@ class RevisaoService:
         )
 
         if not resultado:
-            raise ValueError("Item de revisão não encontrado ao atualizar.")
+            raise RevisaoNotFoundError("Item de revisão não encontrado ao atualizar.")
 
         return resultado

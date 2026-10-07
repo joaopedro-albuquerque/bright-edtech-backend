@@ -1,6 +1,7 @@
 import logging
 from uuid import UUID
 
+from app.core.exceptions import DocumentNotFoundError, ResumoNotFoundError
 from app.repositories.DocumentRepository import DocumentRepository
 from app.repositories.ResumoRepository import ResumoRepository
 from app.services.BedrockService import BedrockService
@@ -31,7 +32,7 @@ class ResumoService:
 
         documento = self.document_repo.buscar_chave_s3_por_documento_id_e_usuario(documento_id, usuario_id)
         if not documento or not documento.get("chave_s3"):
-            raise ValueError("Documento não encontrado ou não pertence ao usuário.")
+            raise DocumentNotFoundError("Documento não encontrado ou não pertence ao usuário.")
 
         arquivo_pdf = self.s3_service.download_file(documento["chave_s3"])
         texto_extraido = extrair_texto_do_pdf(arquivo_pdf)
@@ -71,7 +72,7 @@ class ResumoService:
     def obter_conteudo(self, resumo_id: UUID, usuario_id: UUID) -> dict:
         resumo = self.resumo_repo.buscar_por_id(resumo_id, usuario_id)
         if not resumo:
-            raise ValueError("Resumo não encontrado ou não pertence ao usuário.")
+            raise ResumoNotFoundError("Resumo não encontrado ou não pertence ao usuário.")
 
         texto = self.s3_service.download_text(resumo["s3_chave"])
         return {"id": resumo["id"], "titulo": resumo["titulo"], "conteudo": texto}
@@ -79,7 +80,7 @@ class ResumoService:
     def obter_download_url(self, resumo_id: UUID, usuario_id: UUID) -> str:
         resumo = self.resumo_repo.buscar_por_id(resumo_id, usuario_id)
         if not resumo:
-            raise ValueError("Resumo não encontrado ou não pertence ao usuário.")
+            raise ResumoNotFoundError("Resumo não encontrado ou não pertence ao usuário.")
 
         s3_chave_pdf = resumo.get("s3_chave_pdf")
         if not s3_chave_pdf:
@@ -91,8 +92,13 @@ class ResumoService:
 
         return self.s3_service.generate_presigned_url(s3_chave_pdf)
 
-    def renomear_resumo(self, resumo_id: UUID, usuario_id: UUID, titulo: str) -> dict | None:
-        return self.resumo_repo.atualizar_titulo(resumo_id, usuario_id, titulo)
+    def renomear_resumo(self, resumo_id: UUID, usuario_id: UUID, titulo: str) -> dict:
+        resultado = self.resumo_repo.atualizar_titulo(resumo_id, usuario_id, titulo)
+        if not resultado:
+            raise ResumoNotFoundError("Resumo não encontrado.")
+        return resultado
 
-    def deletar_resumo(self, resumo_id: UUID, usuario_id: UUID) -> bool:
-        return self.resumo_repo.deletar(resumo_id, usuario_id)
+    def deletar_resumo(self, resumo_id: UUID, usuario_id: UUID) -> None:
+        deleted = self.resumo_repo.deletar(resumo_id, usuario_id)
+        if not deleted:
+            raise ResumoNotFoundError("Resumo não encontrado.")

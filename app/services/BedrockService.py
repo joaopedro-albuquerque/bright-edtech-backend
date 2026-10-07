@@ -9,6 +9,8 @@ from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 
+from app.core.exceptions import AiGenerationError
+
 logger = logging.getLogger(__name__)
 
 # Tenta Bedrock primeiro; se falhar (ex: ThrottlingException por cota diária de
@@ -157,7 +159,7 @@ class BedrockService:
                     modelo_usado = self.modelo_fallback
                 except Exception as exc_gemini:
                     logger.error(f"Fallback Gemini também falhou: {exc_gemini}")
-                    raise RuntimeError(
+                    raise AiGenerationError(
                         f"Falha ao invocar IA (Bedrock: {exc_bedrock} | Gemini: {exc_gemini})"
                     ) from exc_gemini
 
@@ -199,7 +201,7 @@ class BedrockService:
                     raise
                 raise
 
-        raise RuntimeError(f"Falha ao invocar Bedrock após {max_retentativas} tentativas.")
+        raise AiGenerationError(f"Falha ao invocar Bedrock após {max_retentativas} tentativas.")
 
     def _invocar_gemini(self, system_prompt: str, chunk: str, max_tokens: int, max_retentativas: int, index: int, total_chunks: int) -> tuple[str, int]:
         config = genai_types.GenerateContentConfig(
@@ -231,7 +233,7 @@ class BedrockService:
                     raise
                 raise
 
-        raise RuntimeError(f"Falha ao invocar Gemini após {max_retentativas} tentativas.")
+        raise AiGenerationError(f"Falha ao invocar Gemini após {max_retentativas} tentativas.")
 
     def _parsear_json_lista(self, texto_resposta: str) -> list:
         texto_limpo = texto_resposta.strip()
@@ -244,4 +246,4 @@ class BedrockService:
             return json.loads(texto_limpo)
         except json.JSONDecodeError as exc:
             logger.error(f"Falha ao parsear JSON retornado pela IA: {exc}. Conteúdo: {texto_limpo[:500]}")
-            raise ValueError("A IA retornou um formato inválido. Tente novamente.") from exc
+            raise AiGenerationError("A IA retornou um formato inválido. Tente novamente.") from exc

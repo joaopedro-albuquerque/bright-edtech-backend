@@ -1,6 +1,8 @@
 from datetime import datetime
 from uuid import UUID
 
+from app.core.exceptions import RevisaoDatabaseError
+
 TABELAS_PERMITIDAS = {
     "cartoes": {"origem_fk": "flashcard_id", "tabela_origem": "flashcards"},
     "questoes": {"origem_fk": "quiz_id", "tabela_origem": "quizzes"},
@@ -34,7 +36,7 @@ class RevisaoRepository:
                 cursor.execute(query, (usuario_id, limit))
                 return cursor.fetchall()
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao buscar pendentes em '{tabela}': {e}")
+            raise RevisaoDatabaseError(f"Erro no banco de dados ao buscar pendentes em '{tabela}'.") from e
 
     def buscar_todos(self, usuario_id: UUID, tabela: str, limit: int = 500) -> list:
         """Mesma consulta de buscar_pendentes_hoje, sem o filtro de data — usada
@@ -56,7 +58,7 @@ class RevisaoRepository:
                 cursor.execute(query, (usuario_id, limit))
                 return cursor.fetchall()
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao buscar todos os itens em '{tabela}': {e}")
+            raise RevisaoDatabaseError(f"Erro no banco de dados ao buscar todos os itens em '{tabela}'.") from e
 
     def buscar_por_id(self, item_id: UUID, usuario_id: UUID, tabela: str) -> dict | None:
         _validar_tabela(tabela)
@@ -71,7 +73,7 @@ class RevisaoRepository:
                 row = cursor.fetchone()
                 return dict(row) if row else None
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao buscar item em '{tabela}': {e}")
+            raise RevisaoDatabaseError(f"Erro no banco de dados ao buscar item em '{tabela}'.") from e
 
     def atualizar_estado(
         self,
@@ -109,4 +111,4 @@ class RevisaoRepository:
                 return dict(row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao atualizar estado em '{tabela}': {e}")
+            raise RevisaoDatabaseError(f"Erro no banco de dados ao atualizar estado em '{tabela}'.") from e

@@ -4,3 +4,4 @@ pytest
 pytest-cov
 pytest-asyncio
 pytest-html
+pytest-mock==3.16.0

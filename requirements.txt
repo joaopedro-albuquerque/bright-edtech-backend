@@ -12,3 +12,4 @@ google-genai
 markdown
 xhtml2pdf
 PyPDF2
+python-json-logger==4.2.0

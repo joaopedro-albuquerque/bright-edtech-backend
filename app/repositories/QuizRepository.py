@@ -2,6 +2,8 @@ from uuid import UUID
 
 import psycopg2.extras
 
+from app.core.exceptions import QuizDatabaseError
+
 
 class QuizRepository:
     def __init__(self, conn):
@@ -31,7 +33,7 @@ class QuizRepository:
                 quiz_row = cursor.fetchone()
 
                 if not quiz_row:
-                    raise RuntimeError("INSERT de quiz não retornou dados.")
+                    raise QuizDatabaseError("INSERT de quiz não retornou dados.")
 
                 quiz_id = quiz_row["id"]
 
@@ -46,7 +48,7 @@ class QuizRepository:
                 return dict(quiz_row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao criar quiz: {e}")
+            raise QuizDatabaseError("Erro no banco de dados ao criar quiz.") from e
 
     def listar_por_documento(self, documento_id: UUID, usuario_id: UUID) -> list:
         try:
@@ -60,7 +62,7 @@ class QuizRepository:
                 cursor.execute(query, (documento_id, usuario_id))
                 return [dict(row) for row in cursor.fetchall()]
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao listar quizzes do documento: {e}")
+            raise QuizDatabaseError("Erro no banco de dados ao listar quizzes do documento.") from e
 
     def buscar_por_id(self, quiz_id: UUID, usuario_id: UUID) -> dict | None:
         try:
@@ -74,7 +76,7 @@ class QuizRepository:
                 row = cursor.fetchone()
                 return dict(row) if row else None
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao buscar quiz: {e}")
+            raise QuizDatabaseError("Erro no banco de dados ao buscar quiz.") from e
 
     def listar_questoes_por_quiz(self, quiz_id: UUID, usuario_id: UUID) -> list:
         try:
@@ -89,7 +91,7 @@ class QuizRepository:
                 cursor.execute(query, (quiz_id, usuario_id))
                 return [dict(row) for row in cursor.fetchall()]
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao listar questões do quiz: {e}")
+            raise QuizDatabaseError("Erro no banco de dados ao listar questões do quiz.") from e
 
     def atualizar_titulo(self, quiz_id: UUID, usuario_id: UUID, titulo: str) -> dict | None:
         try:
@@ -108,7 +110,7 @@ class QuizRepository:
                 return dict(row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao renomear quiz: {e}")
+            raise QuizDatabaseError("Erro no banco de dados ao renomear quiz.") from e
 
     def deletar(self, quiz_id: UUID, usuario_id: UUID) -> bool:
         try:
@@ -122,4 +124,4 @@ class QuizRepository:
                 return deleted
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao deletar quiz: {e}")
+            raise QuizDatabaseError("Erro no banco de dados ao deletar quiz.") from e

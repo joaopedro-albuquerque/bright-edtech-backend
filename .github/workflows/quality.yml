@@ -29,8 +29,7 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Rodar pytest
-        # --cov-fail-under=80 permanece comentado até a suíte cobrir a meta.
-        run: pytest
+        run: pytest --cov-fail-under=80
 
       - name: Publicar relatório
         if: ${{ !cancelled() }}

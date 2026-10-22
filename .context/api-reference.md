@@ -460,7 +460,7 @@ DELETE /documentos/c1000000-0000-0000-0000-000000000001
 X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 ```
 
-**Response:** `204 No Content`.
+**Response:** `204 No Content`. Apaga o original e tudo que foi gerado dele (resumos, flashcards e quizzes), no S3 e no banco.
 
 **Erro:** `404` — `{"detail": "Documento não encontrado"}`
 
@@ -499,7 +499,7 @@ Content-Type: application/json
   "formato": "cornell",
   "nivel_conhecimento": 3,
   "tom": "descontraído e direto ao ponto",
-  "s3_chave": "artifacts/user-3fa85.../doc-c1000.../resumo-d1000....md",
+  "s3_chave": "usuarios/user-3fa85.../doc-c1000.../resumo-d1000....md",
   "tokens_utilizados": 2450,
   "modelo_ia": "claude-3-5-sonnet-20241022",
   "criado_em": "2026-09-11T16:00:00Z"
@@ -588,7 +588,7 @@ X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
   "id": "e1000000-0000-0000-0000-000000000001",
   "documento_id": "c1000000-0000-0000-0000-000000000001",
   "titulo": "Flashcards - Capítulo 1 - Introdução",
-  "s3_chave": "artifacts/user-3fa85.../doc-c1000.../flashcard-e1000....json",
+  "s3_chave": "usuarios/user-3fa85.../doc-c1000.../flashcard-e1000....json",
   "tokens_utilizados": 3100,
   "modelo_ia": "claude-3-5-haiku-20241022",
   "criado_em": "2026-09-11T16:05:00Z"
@@ -666,7 +666,7 @@ X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
   "id": "f1000000-0000-0000-0000-000000000001",
   "documento_id": "c1000000-0000-0000-0000-000000000001",
   "titulo": "Quiz - Capítulo 1 - Introdução",
-  "s3_chave": "artifacts/user-3fa85.../doc-c1000.../quiz-f1000....json",
+  "s3_chave": "usuarios/user-3fa85.../doc-c1000.../quiz-f1000....json",
   "tokens_utilizados": 2800,
   "modelo_ia": "claude-3-5-sonnet-20241022",
   "criado_em": "2026-09-11T16:10:00Z"

@@ -50,7 +50,7 @@ class DocumentGeneratorService:
         ctx.raise_if_any()
 
     def _moderar_documento(self, documento) -> None:
-        """Bloqueia conteúdo sexual. Falha fechada: se a IA não responder, o upload é recusado."""
+        """Bloqueia conteúdo sexual e PDFs sem texto. Falha fechada: se a IA não responder, o upload é recusado."""
         try:
             texto = extrair_texto_do_pdf(documento.file)
         except ValueError:
@@ -59,8 +59,15 @@ class DocumentGeneratorService:
             ctx.raise_if_any()
 
         if not texto:
-            logger.warning("PDF sem texto extraível (provavelmente escaneado): moderação ignorada.")
-            return
+            logger.warning("PDF sem texto extraível (provavelmente escaneado): upload recusado.")
+            ctx = NotificationContext()
+            ctx.add(
+                1007,
+                "documento",
+                "Não foi possível extrair texto deste PDF. Envie um PDF com texto selecionável "
+                "(não escaneado nem impresso como imagem).",
+            )
+            ctx.raise_if_any()
 
         try:
             improprio, motivo = self.bedrock_service.moderar_conteudo(texto)

@@ -166,18 +166,17 @@ class TestModeracaoDeConteudo:
         assert exc_info.value.notifications[0].code == 1006
         self._assert_nada_foi_salvo(document_repo, s3_service)
 
-    def test_pdf_sem_texto_extraivel_nao_chama_ia_e_segue_o_upload(
+    def test_pdf_sem_texto_extraivel_e_recusado_sem_chamar_ia_nem_salvar(
         self, service, texto_do_pdf, bedrock_service, document_repo, s3_service
     ):
         texto_do_pdf.return_value = ""
-        document_repo.criar_documento.return_value = {"id": uuid4()}
-        document_repo.atualizar_chave_s3.return_value = {"id": uuid4(), "chave_s3": "k"}
-        s3_service.bucket_name = "bucket-teste"
 
-        service.salvar_documento(_upload_file(), uuid4(), uuid4(), "Prova")
+        with pytest.raises(ValidationNotificationError) as exc_info:
+            service.salvar_documento(_upload_file(), uuid4(), uuid4(), "Prova")
 
+        assert exc_info.value.notifications[0].code == 1007
         bedrock_service.moderar_conteudo.assert_not_called()
-        s3_service.upload_file.assert_called_once()
+        self._assert_nada_foi_salvo(document_repo, s3_service)
 
     def test_moderacao_so_roda_depois_da_validacao_do_arquivo(self, service, bedrock_service):
         with pytest.raises(ValidationNotificationError):

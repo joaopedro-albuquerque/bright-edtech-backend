@@ -183,3 +183,22 @@ class TestBuscarUsuarioPorCognitoId:
 
         with pytest.raises(ProfileDatabaseError):
             repo.buscar_usuario_por_cognito_id("cognito-abc")
+
+
+class TestBuscarIdPorCognitoId:
+    def test_retorna_id_quando_encontrado(self, repo, mock_cursor):
+        user_id = uuid4()
+        mock_cursor.fetchone.return_value = {"id": user_id}
+
+        assert repo.buscar_id_por_cognito_id("cognito-abc") == user_id
+
+    def test_retorna_none_quando_nao_encontrado(self, repo, mock_cursor):
+        mock_cursor.fetchone.return_value = None
+
+        assert repo.buscar_id_por_cognito_id("cognito-inexistente") is None
+
+    def test_quando_banco_falha_levanta_erro(self, repo, mock_cursor):
+        mock_cursor.execute.side_effect = Exception("falha")
+
+        with pytest.raises(ProfileDatabaseError):
+            repo.buscar_id_por_cognito_id("cognito-abc")

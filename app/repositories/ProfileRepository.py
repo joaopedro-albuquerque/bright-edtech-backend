@@ -147,6 +147,15 @@ class ProfileRepository:
             self.conn.rollback()
             raise ProfileDatabaseError("Erro no banco de dados ao deletar usuário.") from e
 
+    def buscar_id_por_cognito_id(self, cognito_id: str) -> UUID | None:
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("SELECT id FROM usuarios WHERE cognito_id = %s;", (cognito_id,))
+                row = cursor.fetchone()
+                return row["id"] if row else None
+        except Exception as e:
+            raise ProfileDatabaseError("Erro no banco de dados ao buscar ID por Cognito ID.") from e
+
     def buscar_usuario_por_cognito_id(self, cognito_id: str) -> Usuario | None:
             try:
                 with self.conn.cursor() as cursor:

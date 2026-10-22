@@ -51,24 +51,115 @@ class TestGetDb:
 
 
 class TestGetCurrentUserId:
-    def test_com_uuid_valido_retorna_uuid(self):
-        user_id = uuid4()
+    @pytest.fixture
+    def request_com_token(self, mocker):
+        request = mocker.MagicMock()
+        request.state.token_claims = {"sub": "cognito-abc"}
+        return request
 
-        resultado = dependencies.get_current_user_id(x_user_id=str(user_id))
+    @pytest.fixture(autouse=True)
+    def _auth_ligada(self, mocker):
+        mocker.patch("app.api.dependencies.auth_middleware.REQUIRE_AUTH", True)
+
+    def test_com_uuid_do_dono_do_token_retorna_uuid(self, mocker, request_com_token):
+        user_id = uuid4()
+        repo = mocker.MagicMock()
+        repo.buscar_id_por_cognito_id.return_value = user_id
+
+        resultado = dependencies.get_current_user_id(request_com_token, str(user_id), repo)
 
         assert resultado == user_id
+        repo.buscar_id_por_cognito_id.assert_called_once_with("cognito-abc")
 
-    def test_sem_header_levanta_401(self):
+    def test_com_uuid_de_outro_usuario_levanta_403(self, mocker, request_com_token):
+        repo = mocker.MagicMock()
+        repo.buscar_id_por_cognito_id.return_value = uuid4()
+
         with pytest.raises(HTTPException) as exc_info:
-            dependencies.get_current_user_id(x_user_id=None)
+            dependencies.get_current_user_id(request_com_token, str(uuid4()), repo)
+
+        assert exc_info.value.status_code == 403
+
+    def test_com_usuario_inexistente_para_o_token_levanta_403(self, mocker, request_com_token):
+        repo = mocker.MagicMock()
+        repo.buscar_id_por_cognito_id.return_value = None
+
+        with pytest.raises(HTTPException) as exc_info:
+            dependencies.get_current_user_id(request_com_token, str(uuid4()), repo)
+
+        assert exc_info.value.status_code == 403
+
+    def test_sem_claims_no_request_levanta_401(self, mocker):
+        request = mocker.MagicMock()
+        request.state.token_claims = None
+
+        with pytest.raises(HTTPException) as exc_info:
+            dependencies.get_current_user_id(request, str(uuid4()), mocker.MagicMock())
 
         assert exc_info.value.status_code == 401
 
-    def test_com_uuid_invalido_levanta_400(self):
+    def test_sem_header_levanta_401(self, mocker, request_com_token):
         with pytest.raises(HTTPException) as exc_info:
-            dependencies.get_current_user_id(x_user_id="nao-e-um-uuid")
+            dependencies.get_current_user_id(request_com_token, None, mocker.MagicMock())
+
+        assert exc_info.value.status_code == 401
+
+    def test_com_uuid_invalido_levanta_400(self, mocker, request_com_token):
+        with pytest.raises(HTTPException) as exc_info:
+            dependencies.get_current_user_id(request_com_token, "nao-e-um-uuid", mocker.MagicMock())
 
         assert exc_info.value.status_code == 400
+
+    def test_com_auth_desligada_nao_confere_o_token(self, mocker):
+        mocker.patch("app.api.dependencies.auth_middleware.REQUIRE_AUTH", False)
+        user_id = uuid4()
+        repo = mocker.MagicMock()
+
+        resultado = dependencies.get_current_user_id(mocker.MagicMock(), str(user_id), repo)
+
+        assert resultado == user_id
+        repo.buscar_id_por_cognito_id.assert_not_called()
+
+
+class TestGetCurrentUserIdNaRota:
+    @pytest.fixture
+    def client_factory(self, mocker):
+        from fastapi import Depends, FastAPI, Request
+        from fastapi.testclient import TestClient
+
+        mocker.patch("app.api.dependencies.auth_middleware.REQUIRE_AUTH", True)
+
+        def build(id_do_dono):
+            app = FastAPI()
+
+            @app.middleware("http")
+            async def injeta_claims(request: Request, call_next):
+                request.state.token_claims = {"sub": "cognito-abc"}
+                return await call_next(request)
+
+            @app.get("/dados")
+            def dados(usuario_id: UUID = Depends(dependencies.get_current_user_id)):
+                return {"id": str(usuario_id)}
+
+            repo = mocker.MagicMock()
+            repo.buscar_id_por_cognito_id.return_value = id_do_dono
+            app.dependency_overrides[dependencies.get_profile_repository] = lambda: repo
+            return TestClient(app)
+
+        return build
+
+    def test_x_user_id_do_dono_do_token_retorna_200(self, client_factory):
+        dono = uuid4()
+
+        resposta = client_factory(dono).get("/dados", headers={"X-User-Id": str(dono)})
+
+        assert resposta.status_code == 200
+        assert resposta.json() == {"id": str(dono)}
+
+    def test_x_user_id_de_outro_usuario_retorna_403(self, client_factory):
+        resposta = client_factory(uuid4()).get("/dados", headers={"X-User-Id": str(uuid4())})
+
+        assert resposta.status_code == 403
 
 
 class TestFabricasDeRepositorioEServico:

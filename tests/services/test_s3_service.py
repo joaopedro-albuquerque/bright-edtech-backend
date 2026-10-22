@@ -163,8 +163,8 @@ class TestDownloadText:
 
 
 class TestDeletePrefix:
-    def test_build_user_prefix(self, service):
-        assert service.build_user_prefix("u1") == "usuarios/u1/"
+    def test_build_user_prefixes_cobre_enviados_e_gerados(self, service):
+        assert service.build_user_prefixes("u1") == ["usuarios/u1/", "artifacts/u1/"]
 
     def test_apaga_todos_os_objetos_paginados(self, service):
         service.client.get_paginator.return_value.paginate.return_value = [

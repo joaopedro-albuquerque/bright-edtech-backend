@@ -89,7 +89,10 @@ class ProfileService:
             raise ProfileNotFoundError(f"Usuário {user_id} não encontrado.")
 
         # Arquivos primeiro: se falhar, a conta continua intacta e o usuário pode tentar de novo.
-        removidos = self.s3_service.delete_prefix(self.s3_service.build_user_prefix(str(user_id)))
+        removidos = sum(
+            self.s3_service.delete_prefix(prefixo)
+            for prefixo in self.s3_service.build_user_prefixes(str(user_id))
+        )
         logger.info(f"{removidos} arquivo(s) do usuário {user_id} removidos do S3.")
 
         if not self.repo.deletar_usuario_por_id(user_id):

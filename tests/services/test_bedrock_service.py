@@ -226,3 +226,72 @@ class TestGerarConteudo:
         questoes, tokens, modelo = service.gerar_quiz("texto", 5, "dificil")
 
         assert questoes == [{"item_ref": "q_001"}]
+
+
+class TestModerarConteudo:
+    def _mock_invocar(self, service, mocker, resposta):
+        return mocker.patch.object(service, "_invocar_modelo", return_value=(resposta, 10, "modelo"))
+
+    def test_veredito_improprio_retorna_true_e_motivo(self, service, mocker):
+        self._mock_invocar(service, mocker, '{"improprio": true, "motivo": "conteúdo sexual explícito"}')
+
+        improprio, motivo = service.moderar_conteudo("texto qualquer")
+
+        assert improprio is True
+        assert motivo == "conteúdo sexual explícito"
+
+    def test_veredito_proprio_retorna_false(self, service, mocker):
+        self._mock_invocar(service, mocker, '{"improprio": false, "motivo": "material didático"}')
+
+        improprio, _ = service.moderar_conteudo("texto de biologia")
+
+        assert improprio is False
+
+    def test_aceita_resposta_dentro_de_bloco_de_codigo(self, service, mocker):
+        self._mock_invocar(service, mocker, '```json\n{"improprio": false, "motivo": ""}\n```')
+
+        improprio, _ = service.moderar_conteudo("texto")
+
+        assert improprio is False
+
+    @pytest.mark.parametrize("resposta", [
+        "isso não é json",
+        '["improprio"]',
+        '{"motivo": "faltou o campo"}',
+        '{"improprio": "sim"}',
+    ])
+    def test_veredito_invalido_levanta_ai_generation_error(self, service, mocker, resposta):
+        self._mock_invocar(service, mocker, resposta)
+
+        with pytest.raises(AiGenerationError):
+            service.moderar_conteudo("texto")
+
+    def test_falha_da_ia_propaga_ai_generation_error(self, service, mocker):
+        mocker.patch.object(service, "_invocar_modelo", side_effect=AiGenerationError("fora do ar"))
+
+        with pytest.raises(AiGenerationError):
+            service.moderar_conteudo("texto")
+
+    def test_envia_texto_dentro_da_tag_documento_com_prompt_de_moderacao(self, service, mocker):
+        mock = self._mock_invocar(service, mocker, '{"improprio": false}')
+
+        service.moderar_conteudo("conteudo do pdf")
+
+        kwargs = mock.call_args.kwargs
+        assert kwargs["user_content"] == "<documento>\nconteudo do pdf\n</documento>"
+        assert kwargs["system_prompt"] == bedrock_module.SYSTEM_PROMPT_MODERACAO
+        assert kwargs["max_tokens"] == 200
+
+    def test_texto_curto_e_enviado_inteiro(self):
+        assert BedrockService._amostrar_texto("curto") == "curto"
+
+    def test_texto_longo_e_amostrado_com_inicio_meio_e_fim(self):
+        tam = bedrock_module.TAMANHO_AMOSTRA_MODERACAO
+        texto = "A" * tam + "B" * (4 * tam) + "C" * tam
+
+        amostra = BedrockService._amostrar_texto(texto)
+
+        assert len(amostra) < len(texto)
+        assert amostra.startswith("A" * tam)
+        assert amostra.endswith("C" * tam)
+        assert "B" in amostra

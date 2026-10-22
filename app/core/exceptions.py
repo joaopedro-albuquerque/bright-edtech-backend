@@ -31,6 +31,12 @@ class AiGenerationError(InfrastructureError):
     message = "Erro ao gerar conteúdo com IA."
 
 
+class ModeracaoIndisponivelError(InfrastructureError):
+    code = 9004
+    http_status = 503
+    message = "Estamos com problemas internos no momento. Tente novamente em alguns instantes."
+
+
 class UnexpectedError(AppException):
     code = 9999
     http_status = 500
@@ -47,6 +53,12 @@ class DocumentNotFoundError(DocumentError):
     code = 1001
     http_status = 404
     message = "Documento ou pasta não encontrado."
+
+
+class ConteudoImproprioError(DocumentError):
+    code = 1005
+    http_status = 422
+    message = "Este documento contém conteúdo que não é permitido na plataforma."
 
 
 class DocumentDatabaseError(DocumentError):

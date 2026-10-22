@@ -2,9 +2,17 @@ import os
 import logging
 from uuid import UUID
 
-from app.core.exceptions import DocumentNotFoundError, NotificationContext
+from app.core.exceptions import (
+    AiGenerationError,
+    ConteudoImproprioError,
+    DocumentNotFoundError,
+    ModeracaoIndisponivelError,
+    NotificationContext,
+)
 from app.repositories.DocumentRepository import DocumentRepository
+from app.services.BedrockService import BedrockService
 from app.services.S3Service import S3Service
+from app.services.pdf_utils import extrair_texto_do_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +25,11 @@ class DocumentGeneratorService:
         self,
         document_repo: DocumentRepository,
         s3_service: S3Service | None = None,
+        bedrock_service: BedrockService | None = None,
     ):
         self.document_repo = document_repo
         self.s3_service = s3_service or S3Service()
+        self.bedrock_service = bedrock_service or BedrockService()
         logger.info("DocumentGeneratorService inicializado com sucesso.")
 
     def criar_pasta_service(self, usuario_id: UUID, nome: str, pasta_pai_id: UUID | None) -> dict:
@@ -39,12 +49,36 @@ class DocumentGeneratorService:
 
         ctx.raise_if_any()
 
+    def _moderar_documento(self, documento) -> None:
+        """Bloqueia conteúdo sexual. Falha fechada: se a IA não responder, o upload é recusado."""
+        try:
+            texto = extrair_texto_do_pdf(documento.file)
+        except ValueError:
+            ctx = NotificationContext()
+            ctx.add(1006, "documento", "O arquivo PDF está corrompido ou é ilegível.")
+            ctx.raise_if_any()
+
+        if not texto:
+            logger.warning("PDF sem texto extraível (provavelmente escaneado): moderação ignorada.")
+            return
+
+        try:
+            improprio, motivo = self.bedrock_service.moderar_conteudo(texto)
+        except AiGenerationError as exc:
+            logger.error(f"Moderação de conteúdo indisponível, upload bloqueado: {exc}")
+            raise ModeracaoIndisponivelError() from exc
+
+        if improprio:
+            logger.warning(f"Upload recusado pela moderação de conteúdo. Motivo: {motivo}")
+            raise ConteudoImproprioError()
+
     def salvar_documento(self, documento, pasta_id: UUID, usuario_id: UUID, nome_documento: str) -> dict:
         logger.info(f"Iniciando salvamento do documento '{nome_documento}' (Usuário: {usuario_id}, Pasta: {pasta_id}).")
         file_ext = os.path.splitext(documento.filename)[1]
         logger.debug(f"Extensão do arquivo identificada: {file_ext}")
 
         self._validar_arquivo_pdf(documento, file_ext)
+        self._moderar_documento(documento)
 
         logger.info("Criando registro inicial do documento no banco...")
         documento_salvo = self.document_repo.criar_documento(

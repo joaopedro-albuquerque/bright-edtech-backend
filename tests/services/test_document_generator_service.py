@@ -3,7 +3,13 @@ from uuid import uuid4
 
 import pytest
 
-from app.core.exceptions import DocumentNotFoundError, ValidationNotificationError
+from app.core.exceptions import (
+    AiGenerationError,
+    ConteudoImproprioError,
+    DocumentNotFoundError,
+    ModeracaoIndisponivelError,
+    ValidationNotificationError,
+)
 from app.services.DocumentGeneratorService import DocumentGeneratorService
 
 
@@ -18,8 +24,23 @@ def s3_service(mocker):
 
 
 @pytest.fixture
-def service(document_repo, s3_service):
-    return DocumentGeneratorService(document_repo, s3_service)
+def bedrock_service(mocker):
+    bedrock = mocker.MagicMock()
+    bedrock.moderar_conteudo.return_value = (False, "")
+    return bedrock
+
+
+@pytest.fixture(autouse=True)
+def texto_do_pdf(mocker):
+    return mocker.patch(
+        "app.services.DocumentGeneratorService.extrair_texto_do_pdf",
+        return_value="texto de estudo sobre biologia celular",
+    )
+
+
+@pytest.fixture
+def service(document_repo, s3_service, bedrock_service):
+    return DocumentGeneratorService(document_repo, s3_service, bedrock_service)
 
 
 def _upload_file(filename="prova.pdf", content_type="application/pdf", size=1024):
@@ -102,6 +123,67 @@ class TestSalvarDocumento:
             service.salvar_documento(_upload_file(filename="prova.txt"), uuid4(), uuid4(), "Prova")
 
         document_repo.criar_documento.assert_not_called()
+
+
+class TestModeracaoDeConteudo:
+    def _assert_nada_foi_salvo(self, document_repo, s3_service):
+        document_repo.criar_documento.assert_not_called()
+        s3_service.upload_file.assert_not_called()
+
+    def test_conteudo_improprio_levanta_erro_e_nao_salva_nada(
+        self, service, bedrock_service, document_repo, s3_service
+    ):
+        bedrock_service.moderar_conteudo.return_value = (True, "conteúdo sexual explícito")
+
+        with pytest.raises(ConteudoImproprioError) as exc_info:
+            service.salvar_documento(_upload_file(), uuid4(), uuid4(), "Prova")
+
+        assert exc_info.value.code == 1005
+        assert exc_info.value.http_status == 422
+        self._assert_nada_foi_salvo(document_repo, s3_service)
+
+    def test_falha_da_ia_bloqueia_upload_com_mensagem_clara(
+        self, service, bedrock_service, document_repo, s3_service
+    ):
+        bedrock_service.moderar_conteudo.side_effect = AiGenerationError("bedrock e gemini fora")
+
+        with pytest.raises(ModeracaoIndisponivelError) as exc_info:
+            service.salvar_documento(_upload_file(), uuid4(), uuid4(), "Prova")
+
+        assert exc_info.value.code == 9004
+        assert exc_info.value.http_status == 503
+        assert "problemas internos" in exc_info.value.message
+        self._assert_nada_foi_salvo(document_repo, s3_service)
+
+    def test_pdf_ilegivel_levanta_validation_notification_error(
+        self, service, texto_do_pdf, document_repo, s3_service
+    ):
+        texto_do_pdf.side_effect = ValueError("O arquivo PDF está corrompido ou é ilegível.")
+
+        with pytest.raises(ValidationNotificationError) as exc_info:
+            service.salvar_documento(_upload_file(), uuid4(), uuid4(), "Prova")
+
+        assert exc_info.value.notifications[0].code == 1006
+        self._assert_nada_foi_salvo(document_repo, s3_service)
+
+    def test_pdf_sem_texto_extraivel_nao_chama_ia_e_segue_o_upload(
+        self, service, texto_do_pdf, bedrock_service, document_repo, s3_service
+    ):
+        texto_do_pdf.return_value = ""
+        document_repo.criar_documento.return_value = {"id": uuid4()}
+        document_repo.atualizar_chave_s3.return_value = {"id": uuid4(), "chave_s3": "k"}
+        s3_service.bucket_name = "bucket-teste"
+
+        service.salvar_documento(_upload_file(), uuid4(), uuid4(), "Prova")
+
+        bedrock_service.moderar_conteudo.assert_not_called()
+        s3_service.upload_file.assert_called_once()
+
+    def test_moderacao_so_roda_depois_da_validacao_do_arquivo(self, service, bedrock_service):
+        with pytest.raises(ValidationNotificationError):
+            service.salvar_documento(_upload_file(filename="prova.txt"), uuid4(), uuid4(), "Prova")
+
+        bedrock_service.moderar_conteudo.assert_not_called()
 
 
 class TestGerarPreSignedUrlVisualizacao:

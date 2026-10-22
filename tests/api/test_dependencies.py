@@ -11,6 +11,7 @@ def _mock_infra_services(mocker):
     """Isola os testes de DI da construção real de S3Service/BedrockService,
     que dependem de variáveis de ambiente (S3_BUCKET_NAME) inexistentes em CI."""
     mocker.patch("app.services.DocumentGeneratorService.S3Service")
+    mocker.patch("app.services.DocumentGeneratorService.BedrockService")
     mocker.patch("app.services.ResumoService.S3Service")
     mocker.patch("app.services.ResumoService.BedrockService")
     mocker.patch("app.services.FlashcardService.S3Service")

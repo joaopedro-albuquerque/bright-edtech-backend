@@ -160,3 +160,35 @@ class TestDownloadText:
 
         with pytest.raises(StorageError):
             service.download_text("chave.md")
+
+
+class TestDeletePrefix:
+    def test_build_user_prefix(self, service):
+        assert service.build_user_prefix("u1") == "usuarios/u1/"
+
+    def test_apaga_todos_os_objetos_paginados(self, service):
+        service.client.get_paginator.return_value.paginate.return_value = [
+            {"Contents": [{"Key": "usuarios/u1/a.pdf"}, {"Key": "usuarios/u1/b.pdf"}]},
+            {},
+            {"Contents": [{"Key": "usuarios/u1/c.pdf"}]},
+        ]
+
+        removidos = service.delete_prefix("usuarios/u1/")
+
+        assert removidos == 3
+        assert service.client.delete_objects.call_count == 2
+        service.client.get_paginator.return_value.paginate.assert_called_once_with(
+            Bucket="bucket-teste", Prefix="usuarios/u1/"
+        )
+
+    def test_sem_objetos_retorna_zero(self, service):
+        service.client.get_paginator.return_value.paginate.return_value = [{}]
+
+        assert service.delete_prefix("usuarios/u1/") == 0
+        service.client.delete_objects.assert_not_called()
+
+    def test_erro_do_s3_vira_storage_error(self, service):
+        service.client.get_paginator.return_value.paginate.side_effect = _client_error()
+
+        with pytest.raises(StorageError):
+            service.delete_prefix("usuarios/u1/")

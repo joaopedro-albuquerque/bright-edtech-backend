@@ -4,6 +4,7 @@ from uuid import UUID
 from app.core.config import TERMOS_DE_USO_VERSAO
 from app.core.exceptions import NotificationContext, ProfileNotFoundError
 from app.repositories.ProfileRepository import ProfileRepository
+from app.services.S3Service import S3Service
 from app.schemas.user_schema import (
     EstiloPreferidoEnum,
     FormatoPreferidoEnum,
@@ -15,8 +16,9 @@ from app.schemas.user_schema import (
 logger = logging.getLogger(__name__)
 
 class ProfileService:
-    def __init__(self, repo: ProfileRepository):
+    def __init__(self, repo: ProfileRepository, s3_service: S3Service | None = None):
         self.repo = repo
+        self._s3_service = s3_service
         logger.info("ProfileService inicializado com sucesso.")
 
     def _validar_usuario_base(self, usuario: UsuarioBase, exigir_termos: bool) -> None:
@@ -74,11 +76,23 @@ class ProfileService:
         logger.info(f"Onboarding do usuário {user_id} salvo com sucesso.")
         return usuario_atualizado
 
+    @property
+    def s3_service(self) -> S3Service:
+        if self._s3_service is None:
+            self._s3_service = S3Service()
+        return self._s3_service
+
     def deletar_usuario_por_id(self, user_id: UUID) -> None:
         logger.warning(f"Solicitação de exclusão permanente recebida para o usuário ID: {user_id}")
-        sucesso = self.repo.deletar_usuario_por_id(user_id)
-        if not sucesso:
+        if not self.repo.buscar_usuario_por_id(user_id):
             logger.error(f"A exclusão falhou: Usuário {user_id} não foi encontrado ou já havia sido removido.")
+            raise ProfileNotFoundError(f"Usuário {user_id} não encontrado.")
+
+        # Arquivos primeiro: se falhar, a conta continua intacta e o usuário pode tentar de novo.
+        removidos = self.s3_service.delete_prefix(self.s3_service.build_user_prefix(str(user_id)))
+        logger.info(f"{removidos} arquivo(s) do usuário {user_id} removidos do S3.")
+
+        if not self.repo.deletar_usuario_por_id(user_id):
             raise ProfileNotFoundError(f"Usuário {user_id} não encontrado.")
         logger.info(f"Perfil do usuário {user_id} deletado com sucesso do banco de dados.")
 

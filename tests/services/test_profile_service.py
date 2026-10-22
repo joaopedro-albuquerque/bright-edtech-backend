@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 
 from app.core.config import TERMOS_DE_USO_VERSAO
-from app.core.exceptions import ProfileNotFoundError, ValidationNotificationError
+from app.core.exceptions import ProfileNotFoundError, StorageError, ValidationNotificationError
 from app.schemas.user_schema import OnboardingRequest, UsuarioBase
 from app.services.ProfileService import ProfileService
 
@@ -129,16 +129,59 @@ class TestAtualizarPerfilOnboarding:
 
 
 class TestDeletarUsuarioPorId:
-    def test_com_sucesso_nao_levanta_erro(self, service, repo):
+    @pytest.fixture
+    def s3(self, mocker):
+        s3 = mocker.MagicMock()
+        s3.build_user_prefix.side_effect = lambda uid: f"usuarios/{uid}/"
+        s3.delete_prefix.return_value = 2
+        return s3
+
+    def test_apaga_arquivos_do_s3_e_depois_o_banco(self, repo, s3):
+        service = ProfileService(repo, s3)
+        user_id = uuid4()
+        repo.buscar_usuario_por_id.return_value = "usuario"
         repo.deletar_usuario_por_id.return_value = True
 
-        service.deletar_usuario_por_id(uuid4())
+        service.deletar_usuario_por_id(user_id)
 
-    def test_quando_nao_encontrado_levanta_profile_not_found_error(self, service, repo):
+        s3.delete_prefix.assert_called_once_with(f"usuarios/{user_id}/")
+        repo.deletar_usuario_por_id.assert_called_once_with(user_id)
+
+    def test_usuario_inexistente_levanta_not_found_sem_tocar_no_s3(self, repo, s3):
+        service = ProfileService(repo, s3)
+        repo.buscar_usuario_por_id.return_value = None
+
+        with pytest.raises(ProfileNotFoundError):
+            service.deletar_usuario_por_id(uuid4())
+
+        s3.delete_prefix.assert_not_called()
+        repo.deletar_usuario_por_id.assert_not_called()
+
+    def test_falha_no_s3_nao_apaga_o_banco(self, repo, s3):
+        service = ProfileService(repo, s3)
+        repo.buscar_usuario_por_id.return_value = "usuario"
+        s3.delete_prefix.side_effect = StorageError("falha")
+
+        with pytest.raises(StorageError):
+            service.deletar_usuario_por_id(uuid4())
+
+        repo.deletar_usuario_por_id.assert_not_called()
+
+    def test_removido_por_outra_requisicao_levanta_not_found(self, repo, s3):
+        service = ProfileService(repo, s3)
+        repo.buscar_usuario_por_id.return_value = "usuario"
         repo.deletar_usuario_por_id.return_value = False
 
         with pytest.raises(ProfileNotFoundError):
             service.deletar_usuario_por_id(uuid4())
+
+    def test_s3_service_e_criado_sob_demanda(self, repo, mocker):
+        criado = mocker.patch("app.services.ProfileService.S3Service")
+        service = ProfileService(repo)
+
+        assert service.s3_service is criado.return_value
+        assert service.s3_service is criado.return_value
+        criado.assert_called_once_with()
 
 
 class TestBuscarUsuarioPorCognitoId:

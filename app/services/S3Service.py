@@ -21,6 +21,27 @@ class S3Service:
     def build_document_key(self, usuario_id: str, documento_id: str, file_ext: str) -> str:
         return f"usuarios/{usuario_id}/documentos/{documento_id}{file_ext}"
 
+    def build_user_prefix(self, usuario_id: str) -> str:
+        return f"usuarios/{usuario_id}/"
+
+    def delete_prefix(self, prefix: str) -> int:
+        """Apaga todos os objetos sob o prefixo (idempotente). Retorna quantos foram removidos."""
+        removidos = 0
+        try:
+            paginator = self.client.get_paginator("list_objects_v2")
+            for pagina in paginator.paginate(Bucket=self.bucket_name, Prefix=prefix):
+                objetos = [{"Key": o["Key"]} for o in pagina.get("Contents", [])]
+                if not objetos:
+                    continue
+                self.client.delete_objects(
+                    Bucket=self.bucket_name,
+                    Delete={"Objects": objetos, "Quiet": True},
+                )
+                removidos += len(objetos)
+        except (BotoCoreError, ClientError) as exc:
+            raise StorageError("Falha ao remover arquivos do S3.") from exc
+        return removidos
+
     def upload_file(self, file_obj, key: str) -> dict:
         try:
             self.client.upload_fileobj(file_obj, self.bucket_name, key)

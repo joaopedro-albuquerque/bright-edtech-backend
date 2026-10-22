@@ -1,6 +1,7 @@
 import logging
 from uuid import UUID
 
+from app.core.exceptions import DocumentNotFoundError, QuizNotFoundError
 from app.repositories.DocumentRepository import DocumentRepository
 from app.repositories.QuizRepository import QuizRepository
 from app.services.BedrockService import BedrockService
@@ -28,7 +29,7 @@ class QuizService:
 
         documento = self.document_repo.buscar_chave_s3_por_documento_id_e_usuario(documento_id, usuario_id)
         if not documento or not documento.get("chave_s3"):
-            raise ValueError("Documento não encontrado ou não pertence ao usuário.")
+            raise DocumentNotFoundError("Documento não encontrado ou não pertence ao usuário.")
 
         arquivo_pdf = self.s3_service.download_file(documento["chave_s3"])
         texto_extraido = extrair_texto_do_pdf(arquivo_pdf)
@@ -59,7 +60,7 @@ class QuizService:
     def obter_conteudo(self, quiz_id: UUID, usuario_id: UUID) -> dict:
         quiz = self.quiz_repo.buscar_por_id(quiz_id, usuario_id)
         if not quiz:
-            raise ValueError("Quiz não encontrado ou não pertence ao usuário.")
+            raise QuizNotFoundError("Quiz não encontrado ou não pertence ao usuário.")
 
         questoes = self.quiz_repo.listar_questoes_por_quiz(quiz_id, usuario_id)
 
@@ -78,8 +79,13 @@ class QuizService:
 
         return {"id": quiz["id"], "titulo": quiz["titulo"], "questoes": questoes_enriquecidas}
 
-    def renomear_quiz(self, quiz_id: UUID, usuario_id: UUID, titulo: str) -> dict | None:
-        return self.quiz_repo.atualizar_titulo(quiz_id, usuario_id, titulo)
+    def renomear_quiz(self, quiz_id: UUID, usuario_id: UUID, titulo: str) -> dict:
+        resultado = self.quiz_repo.atualizar_titulo(quiz_id, usuario_id, titulo)
+        if not resultado:
+            raise QuizNotFoundError("Quiz não encontrado.")
+        return resultado
 
-    def deletar_quiz(self, quiz_id: UUID, usuario_id: UUID) -> bool:
-        return self.quiz_repo.deletar(quiz_id, usuario_id)
+    def deletar_quiz(self, quiz_id: UUID, usuario_id: UUID) -> None:
+        deleted = self.quiz_repo.deletar(quiz_id, usuario_id)
+        if not deleted:
+            raise QuizNotFoundError("Quiz não encontrado.")

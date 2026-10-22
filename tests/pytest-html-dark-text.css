@@ -1,0 +1,7 @@
+body,
+a,
+#results-table,
+.filters button,
+.collapse button {
+  color: #000 !important;
+}

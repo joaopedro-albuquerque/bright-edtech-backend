@@ -2,6 +2,8 @@ from uuid import UUID
 
 import psycopg2.extras
 
+from app.core.exceptions import FlashcardDatabaseError
+
 
 class FlashcardRepository:
     def __init__(self, conn):
@@ -31,7 +33,7 @@ class FlashcardRepository:
                 flashcard_row = cursor.fetchone()
 
                 if not flashcard_row:
-                    raise RuntimeError("INSERT de flashcard não retornou dados.")
+                    raise FlashcardDatabaseError("INSERT de flashcard não retornou dados.")
 
                 flashcard_id = flashcard_row["id"]
 
@@ -46,7 +48,7 @@ class FlashcardRepository:
                 return dict(flashcard_row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao criar flashcard: {e}")
+            raise FlashcardDatabaseError("Erro no banco de dados ao criar flashcard.") from e
 
     def listar_por_documento(self, documento_id: UUID, usuario_id: UUID) -> list:
         try:
@@ -60,7 +62,7 @@ class FlashcardRepository:
                 cursor.execute(query, (documento_id, usuario_id))
                 return [dict(row) for row in cursor.fetchall()]
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao listar flashcards do documento: {e}")
+            raise FlashcardDatabaseError("Erro no banco de dados ao listar flashcards do documento.") from e
 
     def buscar_por_id(self, flashcard_id: UUID, usuario_id: UUID) -> dict | None:
         try:
@@ -74,7 +76,7 @@ class FlashcardRepository:
                 row = cursor.fetchone()
                 return dict(row) if row else None
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao buscar flashcard: {e}")
+            raise FlashcardDatabaseError("Erro no banco de dados ao buscar flashcard.") from e
 
     def listar_cartoes_por_flashcard(self, flashcard_id: UUID, usuario_id: UUID) -> list:
         try:
@@ -89,7 +91,7 @@ class FlashcardRepository:
                 cursor.execute(query, (flashcard_id, usuario_id))
                 return [dict(row) for row in cursor.fetchall()]
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao listar cartões do flashcard: {e}")
+            raise FlashcardDatabaseError("Erro no banco de dados ao listar cartões do flashcard.") from e
 
     def atualizar_titulo(self, flashcard_id: UUID, usuario_id: UUID, titulo: str) -> dict | None:
         try:
@@ -108,7 +110,7 @@ class FlashcardRepository:
                 return dict(row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao renomear flashcard: {e}")
+            raise FlashcardDatabaseError("Erro no banco de dados ao renomear flashcard.") from e
 
     def deletar(self, flashcard_id: UUID, usuario_id: UUID) -> bool:
         try:
@@ -122,4 +124,4 @@ class FlashcardRepository:
                 return deleted
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao deletar flashcard: {e}")
+            raise FlashcardDatabaseError("Erro no banco de dados ao deletar flashcard.") from e

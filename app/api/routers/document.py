@@ -84,10 +84,7 @@ def listar_conteudo_pasta(
     usuario_id: UUID = Depends(get_current_user_id),
     service: DocumentGeneratorService = Depends(get_document_generator_service)
 ):
-    conteudo = service.listar_conteudo_pasta(pasta_id, usuario_id, limit, offset)
-    if conteudo is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pasta não encontrada")
-    return conteudo
+    return service.listar_conteudo_pasta(pasta_id, usuario_id, limit, offset)
 
 
 @pastas_router.put("/{pasta_id}", response_model=Pasta, status_code=status.HTTP_200_OK)
@@ -97,10 +94,7 @@ def atualizar_pasta(
     usuario_id: UUID = Depends(get_current_user_id),
     service: DocumentGeneratorService = Depends(get_document_generator_service)
 ) -> Pasta:
-    pasta_atualizada = service.atualizar_pasta_nome(pasta_id, nome, usuario_id)
-    if not pasta_atualizada:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pasta não encontrada")
-    return pasta_atualizada
+    return service.atualizar_pasta_nome(pasta_id, nome, usuario_id)
 
 
 @pastas_router.delete("/{pasta_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -109,9 +103,7 @@ def deletar_pasta(
     usuario_id: UUID = Depends(get_current_user_id),
     service: DocumentGeneratorService = Depends(get_document_generator_service)
 ) -> None:
-    deleted = service.deletar_pasta(pasta_id, usuario_id)
-    if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pasta não encontrada")
+    service.deletar_pasta(pasta_id, usuario_id)
     return None
 
 
@@ -135,13 +127,8 @@ def obter_url_visualizacao(
     usuario_id: UUID = Depends(get_current_user_id),
     service: DocumentGeneratorService = Depends(get_document_generator_service)
 ) -> dict:
-    try:
-        url = service.gerar_pre_signed_url_visualizacao(documento_id, usuario_id)
-        return {"url": url}
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+    url = service.gerar_pre_signed_url_visualizacao(documento_id, usuario_id)
+    return {"url": url}
 
 
 @documentos_router.put("/{documento_id}", status_code=status.HTTP_200_OK)
@@ -151,10 +138,7 @@ def atualizar_documento(
     usuario_id: UUID = Depends(get_current_user_id),
     service: DocumentGeneratorService = Depends(get_document_generator_service)
 ):
-    documento_atualizado = service.atualizar_documento_nome(documento_id, nome, usuario_id)
-    if not documento_atualizado:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento não encontrado")
-    return documento_atualizado
+    return service.atualizar_documento_nome(documento_id, nome, usuario_id)
 
 
 @documentos_router.delete("/{documento_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -163,9 +147,7 @@ def deletar_documento(
     usuario_id: UUID = Depends(get_current_user_id),
     service: DocumentGeneratorService = Depends(get_document_generator_service)
 ) -> None:
-    deleted = service.deletar_documento(documento_id, usuario_id)
-    if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento não encontrado")
+    service.deletar_documento(documento_id, usuario_id)
     return None
 
 
@@ -181,16 +163,13 @@ def gerar_resumo(
     usuario_id: UUID = Depends(get_current_user_id),
     service: ResumoService = Depends(get_resumo_service),
 ):
-    try:
-        return service.gerar_resumo(
-            documento_id=documento_id,
-            usuario_id=usuario_id,
-            nivel_conhecimento=payload.nivel_conhecimento,
-            formato=payload.formato.value,
-            tom=payload.tom,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return service.gerar_resumo(
+        documento_id=documento_id,
+        usuario_id=usuario_id,
+        nivel_conhecimento=payload.nivel_conhecimento,
+        formato=payload.formato.value,
+        tom=payload.tom,
+    )
 
 
 @documentos_router.get(
@@ -212,10 +191,7 @@ def obter_conteudo_resumo(
     usuario_id: UUID = Depends(get_current_user_id),
     service: ResumoService = Depends(get_resumo_service),
 ):
-    try:
-        return service.obter_conteudo(resumo_id, usuario_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return service.obter_conteudo(resumo_id, usuario_id)
 
 
 @resumos_router.get("/{resumo_id}/download", status_code=status.HTTP_200_OK)
@@ -224,13 +200,8 @@ def obter_download_pdf_resumo(
     usuario_id: UUID = Depends(get_current_user_id),
     service: ResumoService = Depends(get_resumo_service),
 ) -> dict:
-    try:
-        url = service.obter_download_url(resumo_id, usuario_id)
-        return {"url": url}
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+    url = service.obter_download_url(resumo_id, usuario_id)
+    return {"url": url}
 
 
 @resumos_router.put("/{resumo_id}", response_model=ResumoResponse, status_code=status.HTTP_200_OK)
@@ -240,10 +211,7 @@ def renomear_resumo(
     usuario_id: UUID = Depends(get_current_user_id),
     service: ResumoService = Depends(get_resumo_service),
 ):
-    resumo_atualizado = service.renomear_resumo(resumo_id, usuario_id, payload.titulo)
-    if not resumo_atualizado:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resumo não encontrado")
-    return resumo_atualizado
+    return service.renomear_resumo(resumo_id, usuario_id, payload.titulo)
 
 
 @resumos_router.delete("/{resumo_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -252,9 +220,7 @@ def deletar_resumo(
     usuario_id: UUID = Depends(get_current_user_id),
     service: ResumoService = Depends(get_resumo_service),
 ) -> None:
-    deleted = service.deletar_resumo(resumo_id, usuario_id)
-    if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resumo não encontrado")
+    service.deletar_resumo(resumo_id, usuario_id)
     return None
 
 
@@ -270,10 +236,7 @@ def gerar_flashcards(
     usuario_id: UUID = Depends(get_current_user_id),
     service: FlashcardService = Depends(get_flashcard_service),
 ):
-    try:
-        return service.gerar_flashcards(documento_id, usuario_id, payload.quantidade, payload.dificuldade)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return service.gerar_flashcards(documento_id, usuario_id, payload.quantidade, payload.dificuldade)
 
 
 @documentos_router.get(
@@ -295,10 +258,7 @@ def obter_conteudo_flashcard(
     usuario_id: UUID = Depends(get_current_user_id),
     service: FlashcardService = Depends(get_flashcard_service),
 ):
-    try:
-        return service.obter_conteudo(flashcard_id, usuario_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return service.obter_conteudo(flashcard_id, usuario_id)
 
 
 @flashcards_router.put("/{flashcard_id}", response_model=FlashcardResponse, status_code=status.HTTP_200_OK)
@@ -308,10 +268,7 @@ def renomear_flashcard(
     usuario_id: UUID = Depends(get_current_user_id),
     service: FlashcardService = Depends(get_flashcard_service),
 ):
-    flashcard_atualizado = service.renomear_flashcard(flashcard_id, usuario_id, payload.titulo)
-    if not flashcard_atualizado:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flashcard não encontrado")
-    return flashcard_atualizado
+    return service.renomear_flashcard(flashcard_id, usuario_id, payload.titulo)
 
 
 @flashcards_router.delete("/{flashcard_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -320,9 +277,7 @@ def deletar_flashcard(
     usuario_id: UUID = Depends(get_current_user_id),
     service: FlashcardService = Depends(get_flashcard_service),
 ) -> None:
-    deleted = service.deletar_flashcard(flashcard_id, usuario_id)
-    if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flashcard não encontrado")
+    service.deletar_flashcard(flashcard_id, usuario_id)
     return None
 
 
@@ -338,10 +293,7 @@ def gerar_quiz(
     usuario_id: UUID = Depends(get_current_user_id),
     service: QuizService = Depends(get_quiz_service),
 ):
-    try:
-        return service.gerar_quiz(documento_id, usuario_id, payload.quantidade, payload.dificuldade)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return service.gerar_quiz(documento_id, usuario_id, payload.quantidade, payload.dificuldade)
 
 
 @documentos_router.get(
@@ -363,10 +315,7 @@ def obter_conteudo_quiz(
     usuario_id: UUID = Depends(get_current_user_id),
     service: QuizService = Depends(get_quiz_service),
 ):
-    try:
-        return service.obter_conteudo(quiz_id, usuario_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return service.obter_conteudo(quiz_id, usuario_id)
 
 
 @quizzes_router.put("/{quiz_id}", response_model=QuizResponse, status_code=status.HTTP_200_OK)
@@ -376,10 +325,7 @@ def renomear_quiz(
     usuario_id: UUID = Depends(get_current_user_id),
     service: QuizService = Depends(get_quiz_service),
 ):
-    quiz_atualizado = service.renomear_quiz(quiz_id, usuario_id, payload.titulo)
-    if not quiz_atualizado:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz não encontrado")
-    return quiz_atualizado
+    return service.renomear_quiz(quiz_id, usuario_id, payload.titulo)
 
 
 @quizzes_router.delete("/{quiz_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -388,7 +334,5 @@ def deletar_quiz(
     usuario_id: UUID = Depends(get_current_user_id),
     service: QuizService = Depends(get_quiz_service),
 ) -> None:
-    deleted = service.deletar_quiz(quiz_id, usuario_id)
-    if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz não encontrado")
+    service.deletar_quiz(quiz_id, usuario_id)
     return None

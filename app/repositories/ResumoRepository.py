@@ -1,5 +1,7 @@
 from uuid import UUID
 
+from app.core.exceptions import ResumoDatabaseError
+
 
 class ResumoRepository:
     def __init__(self, conn):
@@ -35,13 +37,13 @@ class ResumoRepository:
                 row = cursor.fetchone()
 
                 if not row:
-                    raise RuntimeError("INSERT executado, mas RETURNING não devolveu o resumo.")
+                    raise ResumoDatabaseError("INSERT executado, mas RETURNING não devolveu o resumo.")
 
                 self.conn.commit()
                 return dict(row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao criar resumo: {e}")
+            raise ResumoDatabaseError("Erro no banco de dados ao criar resumo.") from e
 
     def listar_por_documento(self, documento_id: UUID, usuario_id: UUID) -> list:
         try:
@@ -56,7 +58,7 @@ class ResumoRepository:
                 cursor.execute(query, (documento_id, usuario_id))
                 return [dict(row) for row in cursor.fetchall()]
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao listar resumos do documento: {e}")
+            raise ResumoDatabaseError("Erro no banco de dados ao listar resumos do documento.") from e
 
     def buscar_por_id(self, resumo_id: UUID, usuario_id: UUID) -> dict | None:
         try:
@@ -71,7 +73,7 @@ class ResumoRepository:
                 row = cursor.fetchone()
                 return dict(row) if row else None
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao buscar resumo: {e}")
+            raise ResumoDatabaseError("Erro no banco de dados ao buscar resumo.") from e
 
     def atualizar_titulo(self, resumo_id: UUID, usuario_id: UUID, titulo: str) -> dict | None:
         try:
@@ -91,7 +93,7 @@ class ResumoRepository:
                 return dict(row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao renomear resumo: {e}")
+            raise ResumoDatabaseError("Erro no banco de dados ao renomear resumo.") from e
 
     def atualizar_s3_chave_pdf(self, resumo_id: UUID, usuario_id: UUID, s3_chave_pdf: str) -> dict | None:
         try:
@@ -111,7 +113,7 @@ class ResumoRepository:
                 return dict(row)
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao atualizar chave do PDF do resumo: {e}")
+            raise ResumoDatabaseError("Erro no banco de dados ao atualizar chave do PDF do resumo.") from e
 
     def deletar(self, resumo_id: UUID, usuario_id: UUID) -> bool:
         try:
@@ -125,4 +127,4 @@ class ResumoRepository:
                 return deleted
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao deletar resumo: {e}")
+            raise ResumoDatabaseError("Erro no banco de dados ao deletar resumo.") from e

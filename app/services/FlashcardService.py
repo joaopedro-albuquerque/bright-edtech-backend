@@ -1,6 +1,7 @@
 import logging
 from uuid import UUID
 
+from app.core.exceptions import DocumentNotFoundError, FlashcardNotFoundError
 from app.repositories.DocumentRepository import DocumentRepository
 from app.repositories.FlashcardRepository import FlashcardRepository
 from app.services.BedrockService import BedrockService
@@ -28,7 +29,7 @@ class FlashcardService:
 
         documento = self.document_repo.buscar_chave_s3_por_documento_id_e_usuario(documento_id, usuario_id)
         if not documento or not documento.get("chave_s3"):
-            raise ValueError("Documento não encontrado ou não pertence ao usuário.")
+            raise DocumentNotFoundError("Documento não encontrado ou não pertence ao usuário.")
 
         arquivo_pdf = self.s3_service.download_file(documento["chave_s3"])
         texto_extraido = extrair_texto_do_pdf(arquivo_pdf)
@@ -59,7 +60,7 @@ class FlashcardService:
     def obter_conteudo(self, flashcard_id: UUID, usuario_id: UUID) -> dict:
         flashcard = self.flashcard_repo.buscar_por_id(flashcard_id, usuario_id)
         if not flashcard:
-            raise ValueError("Flashcard não encontrado ou não pertence ao usuário.")
+            raise FlashcardNotFoundError("Flashcard não encontrado ou não pertence ao usuário.")
 
         cartoes = self.flashcard_repo.listar_cartoes_por_flashcard(flashcard_id, usuario_id)
 
@@ -78,8 +79,13 @@ class FlashcardService:
 
         return {"id": flashcard["id"], "titulo": flashcard["titulo"], "cartoes": cartoes_enriquecidos}
 
-    def renomear_flashcard(self, flashcard_id: UUID, usuario_id: UUID, titulo: str) -> dict | None:
-        return self.flashcard_repo.atualizar_titulo(flashcard_id, usuario_id, titulo)
+    def renomear_flashcard(self, flashcard_id: UUID, usuario_id: UUID, titulo: str) -> dict:
+        resultado = self.flashcard_repo.atualizar_titulo(flashcard_id, usuario_id, titulo)
+        if not resultado:
+            raise FlashcardNotFoundError("Flashcard não encontrado.")
+        return resultado
 
-    def deletar_flashcard(self, flashcard_id: UUID, usuario_id: UUID) -> bool:
-        return self.flashcard_repo.deletar(flashcard_id, usuario_id)
+    def deletar_flashcard(self, flashcard_id: UUID, usuario_id: UUID) -> None:
+        deleted = self.flashcard_repo.deletar(flashcard_id, usuario_id)
+        if not deleted:
+            raise FlashcardNotFoundError("Flashcard não encontrado.")

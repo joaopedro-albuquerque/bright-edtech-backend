@@ -11,6 +11,7 @@ TERMOS_DE_USO_VERSAO = "1.0"
 class Settings:
     aws_region: str = os.getenv("AWS_REGION", "us-east-1")
     s3_bucket_name: str | None = os.getenv("S3_BUCKET_NAME")
+    log_level: str = os.getenv("LOG_LEVEL", "INFO")
 
     bedrock_region: str = os.getenv("BEDROCK_REGION", os.getenv("AWS_REGION", "us-east-1"))
     bedrock_model_summary: str = os.getenv(

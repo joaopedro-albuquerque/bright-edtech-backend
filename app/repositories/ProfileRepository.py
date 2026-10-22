@@ -1,4 +1,6 @@
 from uuid import UUID
+
+from app.core.exceptions import ProfileDatabaseError
 from app.schemas.user_schema import OnboardingRequest, Usuario, UsuarioBase
 
 class ProfileRepository:
@@ -25,19 +27,19 @@ class ProfileRepository:
                     usuario.cognito_id,
                     usuario.termos_versao,
                 ))
-                
+
                 row = cursor.fetchone()
-                
+
                 if not row:
-                    raise RuntimeError("INSERT executado, mas RETURNING falhou ao devolver o usuário.")
-                
+                    raise ProfileDatabaseError("INSERT executado, mas RETURNING falhou ao devolver o usuário.")
+
                 self.conn.commit()
                 return Usuario(**row)
-                
+
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao criar usuário: {e}")
-        
+            raise ProfileDatabaseError("Erro no banco de dados ao criar usuário.") from e
+
     def atualizar_usuario_por_id(self, user_id: UUID, usuario: UsuarioBase) -> Usuario | None:
         try:
             with self.conn.cursor() as cursor:
@@ -65,17 +67,17 @@ class ProfileRepository:
                 ))
 
                 row = cursor.fetchone()
-                
+
                 if not row:
                     self.conn.rollback()
                     return None
-                    
+
                 self.conn.commit()
                 return Usuario(**row)
-                
+
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao atualizar usuário: {e}")
+            raise ProfileDatabaseError("Erro no banco de dados ao atualizar usuário.") from e
 
     def atualizar_perfil_onboarding(self, user_id: UUID, perfil: OnboardingRequest) -> Usuario | None:
         try:
@@ -108,7 +110,7 @@ class ProfileRepository:
 
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao salvar perfil de onboarding: {e}")
+            raise ProfileDatabaseError("Erro no banco de dados ao salvar perfil de onboarding.") from e
 
     def buscar_usuario_por_id(self, user_id: UUID) -> Usuario | None:
         try:
@@ -123,9 +125,9 @@ class ProfileRepository:
                 row = cursor.fetchone()
 
                 return Usuario(**row) if row else None
-                
+
         except Exception as e:
-            raise RuntimeError(f"Erro no banco de dados ao buscar usuário por ID: {e}")
+            raise ProfileDatabaseError("Erro no banco de dados ao buscar usuário por ID.") from e
 
     def deletar_usuario_por_id(self, user_id: UUID) -> bool:
         try:
@@ -140,10 +142,10 @@ class ProfileRepository:
                 self.conn.commit()
 
                 return deleted
-                
+
         except Exception as e:
             self.conn.rollback()
-            raise RuntimeError(f"Erro no banco de dados ao deletar usuário: {e}")
+            raise ProfileDatabaseError("Erro no banco de dados ao deletar usuário.") from e
 
     def buscar_usuario_por_cognito_id(self, cognito_id: str) -> Usuario | None:
             try:
@@ -157,6 +159,6 @@ class ProfileRepository:
                     row = cursor.fetchone()
 
                     return Usuario(**row) if row else None
-                    
+
             except Exception as e:
-                raise RuntimeError(f"Erro no banco de dados ao buscar usuário por Cognito ID: {e}")
+                raise ProfileDatabaseError("Erro no banco de dados ao buscar usuário por Cognito ID.") from e

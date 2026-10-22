@@ -77,7 +77,7 @@ CREATE TABLE resumos (
 CREATE TABLE flashcards (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     usuario_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
-    documento_id UUID REFERENCES documentos(id) ON DELETE SET NULL,
+    documento_id UUID REFERENCES documentos(id) ON DELETE CASCADE,
     titulo VARCHAR(255) NOT NULL,
     s3_chave TEXT NOT NULL,
     tokens_utilizados INT DEFAULT 0,
@@ -102,7 +102,7 @@ CREATE TABLE cartoes (
 CREATE TABLE quizzes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     usuario_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
-    documento_id UUID REFERENCES documentos(id) ON DELETE SET NULL,
+    documento_id UUID REFERENCES documentos(id) ON DELETE CASCADE,
     titulo VARCHAR(255) NOT NULL,
     s3_chave TEXT NOT NULL,
     tokens_utilizados INT DEFAULT 0,

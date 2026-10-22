@@ -165,6 +165,8 @@ class DocumentGeneratorService:
 
     def deletar_documento(self, documento_id: UUID, usuario_id: UUID) -> None:
         logger.warning(f"Solicitação de exclusão para o documento {documento_id}.")
+        # Arquivos primeiro: se falhar, nada é apagado e o usuário pode tentar de novo.
+        self.s3_service.delete_prefix(self.s3_service.build_document_prefix(str(usuario_id), str(documento_id)))
         resultado = self.document_repo.deletar_documento(documento_id, usuario_id)
         if not resultado:
             logger.warning(f"Documento {documento_id} não encontrado ou já deletado.")

@@ -42,10 +42,10 @@ class ResumoService:
         )
 
         titulo = f"Resumo ({formato})"
-        s3_chave = f"artifacts/{usuario_id}/{documento_id}/resumo-{formato}.md"
+        s3_chave = self.s3_service.build_artifact_key(usuario_id, documento_id, f"resumo-{formato}.md")
         self.s3_service.upload_text(texto_gerado, s3_chave)
 
-        s3_chave_pdf = f"artifacts/{usuario_id}/{documento_id}/resumo-{formato}.pdf"
+        s3_chave_pdf = self.s3_service.build_artifact_key(usuario_id, documento_id, f"resumo-{formato}.pdf")
         try:
             pdf_bytes = gerar_pdf_de_markdown(texto_gerado, titulo)
             self.s3_service.upload_bytes(pdf_bytes, s3_chave_pdf, content_type="application/pdf")
@@ -86,7 +86,9 @@ class ResumoService:
         if not s3_chave_pdf:
             texto_markdown = self.s3_service.download_text(resumo["s3_chave"])
             pdf_bytes = gerar_pdf_de_markdown(texto_markdown, resumo["titulo"])
-            s3_chave_pdf = f"artifacts/{usuario_id}/{resumo['documento_id']}/resumo-{resumo['formato']}.pdf"
+            s3_chave_pdf = self.s3_service.build_artifact_key(
+                usuario_id, resumo["documento_id"], f"resumo-{resumo['formato']}.pdf"
+            )
             self.s3_service.upload_bytes(pdf_bytes, s3_chave_pdf, content_type="application/pdf")
             self.resumo_repo.atualizar_s3_chave_pdf(resumo_id, usuario_id, s3_chave_pdf)
 

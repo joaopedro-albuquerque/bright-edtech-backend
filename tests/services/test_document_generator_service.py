@@ -8,6 +8,7 @@ from app.core.exceptions import (
     ConteudoImproprioError,
     DocumentNotFoundError,
     ModeracaoIndisponivelError,
+    StorageError,
     ValidationNotificationError,
 )
 from app.services.DocumentGeneratorService import DocumentGeneratorService
@@ -267,16 +268,30 @@ class TestAtualizarDocumentoNome:
 
 
 class TestDeletarDocumento:
-    def test_com_sucesso_nao_levanta_erro(self, service, document_repo):
+    def test_apaga_arquivos_do_documento_e_depois_o_banco(self, service, document_repo, s3_service):
+        usuario_id, documento_id = uuid4(), uuid4()
+        s3_service.build_document_prefix.return_value = "usuarios/u/d/"
         document_repo.deletar_documento.return_value = True
 
-        service.deletar_documento(uuid4(), uuid4())
+        service.deletar_documento(documento_id, usuario_id)
+
+        s3_service.build_document_prefix.assert_called_once_with(str(usuario_id), str(documento_id))
+        s3_service.delete_prefix.assert_called_once_with("usuarios/u/d/")
+        document_repo.deletar_documento.assert_called_once_with(documento_id, usuario_id)
 
     def test_quando_nao_encontrado_levanta_document_not_found_error(self, service, document_repo):
         document_repo.deletar_documento.return_value = False
 
         with pytest.raises(DocumentNotFoundError):
             service.deletar_documento(uuid4(), uuid4())
+
+    def test_falha_no_s3_nao_apaga_o_banco(self, service, document_repo, s3_service):
+        s3_service.delete_prefix.side_effect = StorageError("falha")
+
+        with pytest.raises(StorageError):
+            service.deletar_documento(uuid4(), uuid4())
+
+        document_repo.deletar_documento.assert_not_called()
 
 
 class TestDeletarPasta:

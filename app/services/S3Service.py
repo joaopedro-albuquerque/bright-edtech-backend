@@ -18,12 +18,17 @@ class S3Service:
             region_name=os.getenv("AWS_REGION", "us-east-1")
         )
 
-    def build_document_key(self, usuario_id: str, documento_id: str, file_ext: str) -> str:
-        return f"usuarios/{usuario_id}/documentos/{documento_id}{file_ext}"
+    def build_user_prefix(self, usuario_id: str) -> str:
+        return f"usuarios/{usuario_id}/"
 
-    def build_user_prefixes(self, usuario_id: str) -> list[str]:
-        """Prefixos de tudo que o usuário tem no bucket: arquivos enviados e gerados pela IA."""
-        return [f"usuarios/{usuario_id}/", f"artifacts/{usuario_id}/"]
+    def build_document_prefix(self, usuario_id: str, documento_id: str) -> str:
+        return f"usuarios/{usuario_id}/{documento_id}/"
+
+    def build_document_key(self, usuario_id: str, documento_id: str, file_ext: str) -> str:
+        return self.build_artifact_key(usuario_id, documento_id, f"original{file_ext}")
+
+    def build_artifact_key(self, usuario_id: str, documento_id: str, nome: str) -> str:
+        return f"{self.build_document_prefix(usuario_id, documento_id)}{nome}"
 
     def delete_prefix(self, prefix: str) -> int:
         """Apaga todos os objetos sob o prefixo (idempotente). Retorna quantos foram removidos."""

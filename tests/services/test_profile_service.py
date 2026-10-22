@@ -132,7 +132,7 @@ class TestDeletarUsuarioPorId:
     @pytest.fixture
     def s3(self, mocker):
         s3 = mocker.MagicMock()
-        s3.build_user_prefixes.side_effect = lambda uid: [f"usuarios/{uid}/", f"artifacts/{uid}/"]
+        s3.build_user_prefix.side_effect = lambda uid: f"usuarios/{uid}/"
         s3.delete_prefix.return_value = 2
         return s3
 
@@ -144,10 +144,7 @@ class TestDeletarUsuarioPorId:
 
         service.deletar_usuario_por_id(user_id)
 
-        assert [c.args[0] for c in s3.delete_prefix.call_args_list] == [
-            f"usuarios/{user_id}/",
-            f"artifacts/{user_id}/",
-        ]
+        s3.delete_prefix.assert_called_once_with(f"usuarios/{user_id}/")
         repo.deletar_usuario_por_id.assert_called_once_with(user_id)
 
     def test_usuario_inexistente_levanta_not_found_sem_tocar_no_s3(self, repo, s3):

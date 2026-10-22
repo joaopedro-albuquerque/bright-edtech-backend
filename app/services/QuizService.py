@@ -39,7 +39,7 @@ class QuizService:
         )
 
         titulo = "Quiz Gerado"
-        s3_chave = f"artifacts/{usuario_id}/{documento_id}/quiz-{quantidade}.json"
+        s3_chave = self.s3_service.build_artifact_key(usuario_id, documento_id, f"quiz-{quantidade}.json")
         self.s3_service.upload_json(questoes_json, s3_chave)
 
         item_refs = [questao["item_ref"] for questao in questoes_json]

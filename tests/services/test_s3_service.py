@@ -45,7 +45,7 @@ class TestInit:
 def test_build_document_key_monta_caminho_esperado(service):
     resultado = service.build_document_key("user-1", "doc-1", ".pdf")
 
-    assert resultado == "usuarios/user-1/documentos/doc-1.pdf"
+    assert resultado == "usuarios/user-1/doc-1/original.pdf"
 
 
 class TestUploadFile:
@@ -163,8 +163,10 @@ class TestDownloadText:
 
 
 class TestDeletePrefix:
-    def test_build_user_prefixes_cobre_enviados_e_gerados(self, service):
-        assert service.build_user_prefixes("u1") == ["usuarios/u1/", "artifacts/u1/"]
+    def test_prefixos_e_chaves_ficam_sob_o_mesmo_usuario(self, service):
+        assert service.build_user_prefix("u1") == "usuarios/u1/"
+        assert service.build_document_prefix("u1", "d1") == "usuarios/u1/d1/"
+        assert service.build_artifact_key("u1", "d1", "quiz-5.json") == "usuarios/u1/d1/quiz-5.json"
 
     def test_apaga_todos_os_objetos_paginados(self, service):
         service.client.get_paginator.return_value.paginate.return_value = [

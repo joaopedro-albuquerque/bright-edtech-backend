@@ -35,7 +35,7 @@ fotossíntese, clorofila, ATP, NADPH, Ciclo de Calvin, oxigênio
 ### System Prompt Injetado (Pseudocódigo)
 ```
 System: Você é um especialista em síntese acadêmica. 
-Seu objetivo é extrair os 5-7 tópicos MAIS IMPORTANTES do texto fornecido.
+Seu objetivo é extrair os 5-7 tópicos MAIS IMPORTANTES do documento fornecido.
 
 Regras:
 1. Use bullet points concisos (máx. 2 linhas por ponto)
@@ -234,12 +234,16 @@ Output esperado: Fichamento acadêmico completo
 ### No Bedrock Request
 ```python
 {
-  "max_tokens": 2048,
+  "max_tokens": 4096,
   "system": f"{SYSTEM_PROMPT[modelo]}",
   "messages": [
     {
       "role": "user",
-      "content": conteudo_extraido_do_pdf
+      "content": [
+        # o PDF vai inteiro, como documento nativo (o modelo lê texto, figuras e tabelas)
+        {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_em_base64}},
+        {"type": "text", "text": "Gere o resumo do documento PDF anexado, seguindo as instruções do sistema."}
+      ]
     }
   ]
 }

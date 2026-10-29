@@ -292,7 +292,7 @@ X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 GET /pastas/user/3fa85f64-5717-4562-b3fc-2c963f66afa6/todas
 ```
 
-**Response `200 OK`** (`list[PastaListagemResponse]`): mesmo formato do 2.2, mas inclui subpastas de todos os níveis (não só raiz).
+**Response `200 OK`** (`list[PastaListagemResponse]`): mesmo formato do 2.2, mas inclui subpastas de todos os níveis (não só raiz). Cada item traz também `pasta_pai_id` (UUID da pasta superior; `null` nas pastas raiz), que o front usa para montar a árvore de pastas.
 
 ---
 
@@ -408,6 +408,12 @@ curl -X POST http://localhost:8000/documentos/upload \
 
 **Response `201 Created`:** objeto do documento criado (id, nome, status inicial, etc — status normalmente começa como `"processando"` até o upload/parse terminar).
 
+**Validações do upload** (todas antes de gravar no banco ou no S3):
+- `400` / `1003` — não é PDF; `1004` — acima de 5 MB (as duas podem vir juntas na lista de violações); `1006` — PDF corrompido ou ilegível; `1008` — PDF com mais de 100 páginas.
+- `422` / `1005` — conteúdo impróprio na moderação (feita sobre uma amostra de páginas: início, meio e fim, texto e imagens).
+- `503` / `9004` — moderação indisponível (falha fechada: o upload é recusado).
+- PDFs escaneados (só imagem) são **aceitos**: o modelo lê as páginas como imagem.
+
 ---
 
 ### 3.2 URL pré-assinada para visualização — `GET /documentos/{documento_id}/url-visualizacao`
@@ -463,6 +469,44 @@ X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 **Response:** `204 No Content`. Apaga o original e tudo que foi gerado dele (resumos, flashcards e quizzes), no S3 e no banco.
 
 **Erro:** `404` — `{"detail": "Documento não encontrado"}`
+
+---
+
+### 3.5 Buscar documentos por nome — `GET /documentos`
+
+🔒 Auth: `X-User-Id` (header). Busca em todas as pastas do usuário, sem diferenciar maiúsculas nem acentos.
+
+**Query params:** `q` (termo; vazio lista todos; até 100 caracteres), `limit` (padrão 20, 1–50), `offset` (padrão 0).
+```
+GET /documentos?q=sono&limit=20&offset=0
+X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+```
+
+**Response `200 OK`:**
+```json
+{
+  "itens": [
+    {
+      "id": "c1000000-0000-0000-0000-000000000001",
+      "nome": "A Importância do Sono para a Saúde Mental",
+      "pasta_nome": "Hábitos Saudáveis",
+      "pasta_caminho": "Saúde Mental › Hábitos Saudáveis",
+      "criado_em": "2026-10-29T10:00:00"
+    }
+  ],
+  "total": 1,
+  "tem_mais": false
+}
+```
+Ordenado do mais recente para o mais antigo. `pasta_caminho` é o caminho completo da pasta (separado por ` › `) e vem `null` se o documento estiver sem pasta. `limit` fora de 1–50 ou `offset` negativo retornam `422`.
+
+---
+
+### 3.6 PDF original (bytes) — `GET /documentos/{documento_id}/arquivo`
+
+🔒 Auth: `X-User-Id` (header). Devolve o próprio PDF (`Content-Type: application/pdf`, `Content-Disposition: inline`, `Cache-Control: private, no-store`). É a rota usada pelo visualizador de PDF do front (o bucket não tem CORS, então não dá para ler direto do S3 no navegador).
+
+**Erro:** `404` se o documento não existir ou não pertencer ao usuário.
 
 ---
 
@@ -544,6 +588,16 @@ X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 `conteudo` é markdown puro (string) — renderizar com uma lib de markdown-to-html no front.
 
 **Erro:** `404` — `{"detail": "Resumo não encontrado ou não pertence ao usuário."}`
+
+---
+
+### 4.3b PDF do resumo (bytes) — `GET /resumos/{resumo_id}/pdf`
+
+🔒 Auth: `X-User-Id` (header). Devolve o PDF do resumo (`application/pdf`, `inline`). Se o PDF ainda não existir, é gerado a partir do markdown, gravado no S3 e devolvido. Usado pelo visualizador de PDF do front. `404` se o resumo não existir ou não pertencer ao usuário.
+
+### 4.3c URL de download do PDF — `GET /resumos/{resumo_id}/download`
+
+🔒 Auth: `X-User-Id` (header). Retorna `{"url": "<URL pré-assinada, válida por 5 minutos>"}` para baixar o PDF do resumo.
 
 ---
 

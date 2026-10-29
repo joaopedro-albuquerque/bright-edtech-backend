@@ -1,3 +1,4 @@
+import io
 from uuid import uuid4
 
 import pytest
@@ -35,28 +36,27 @@ class TestGerarResumo:
     def test_com_sucesso_gera_resumo_e_pdf(
         self, service, document_repo, s3_service, bedrock_service, resumo_repo, mocker
     ):
-        mocker.patch("app.services.ResumoService.extrair_texto_do_pdf", return_value="texto extraído")
         mocker.patch("app.services.ResumoService.gerar_pdf_de_markdown", return_value=b"pdf-bytes")
         document_repo.buscar_chave_s3_por_documento_id_e_usuario.return_value = {"chave_s3": "doc.pdf"}
-        s3_service.download_file.return_value = b"pdf-bytes"
+        s3_service.download_file.return_value = io.BytesIO(b"pdf-bytes")
         bedrock_service.gerar_resumo.return_value = ("texto gerado", 100, "modelo-x")
         resumo_repo.criar.return_value = {"id": uuid4()}
 
         resultado = service.gerar_resumo(uuid4(), uuid4(), nivel_conhecimento=5, formato="cornell", tom="formal")
 
         assert "id" in resultado
+        bedrock_service.gerar_resumo.assert_called_once_with(b"pdf-bytes", "cornell", 5, "formal")
         chamada = resumo_repo.criar.call_args
         assert chamada.kwargs["s3_chave_pdf"] is not None
 
     def test_quando_geracao_de_pdf_falha_usa_none_como_fallback(
         self, service, document_repo, s3_service, bedrock_service, resumo_repo, mocker
     ):
-        mocker.patch("app.services.ResumoService.extrair_texto_do_pdf", return_value="texto extraído")
         mocker.patch(
             "app.services.ResumoService.gerar_pdf_de_markdown", side_effect=Exception("falha no reportlab")
         )
         document_repo.buscar_chave_s3_por_documento_id_e_usuario.return_value = {"chave_s3": "doc.pdf"}
-        s3_service.download_file.return_value = b"pdf-bytes"
+        s3_service.download_file.return_value = io.BytesIO(b"pdf-bytes")
         bedrock_service.gerar_resumo.return_value = ("texto gerado", 100, "modelo-x")
         resumo_repo.criar.return_value = {"id": uuid4()}
 

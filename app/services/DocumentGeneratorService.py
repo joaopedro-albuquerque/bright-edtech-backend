@@ -12,11 +12,12 @@ from app.core.exceptions import (
 from app.repositories.DocumentRepository import DocumentRepository
 from app.services.BedrockService import BedrockService
 from app.services.S3Service import S3Service
-from app.services.pdf_utils import extrair_texto_do_pdf
+from app.services.pdf_utils import amostrar_paginas, contar_paginas
 
 logger = logging.getLogger(__name__)
 
 TAMANHO_MAXIMO_PDF_BYTES = 5 * 1024 * 1024
+MAXIMO_PAGINAS_PDF = 100
 CONTENT_TYPES_PDF_VALIDOS = {"application/pdf"}
 
 
@@ -50,27 +51,31 @@ class DocumentGeneratorService:
         ctx.raise_if_any()
 
     def _moderar_documento(self, documento) -> None:
-        """Bloqueia conteúdo sexual e PDFs sem texto. Falha fechada: se a IA não responder, o upload é recusado."""
+        """Bloqueia PDFs ilegíveis, longos demais e conteúdo sexual. Falha fechada: se a IA não responder, o upload é recusado."""
         try:
-            texto = extrair_texto_do_pdf(documento.file)
+            total_paginas = contar_paginas(documento.file)
+        except ValueError:
+            total_paginas = 0
+
+        if total_paginas == 0:
+            ctx = NotificationContext()
+            ctx.add(1006, "documento", "O arquivo PDF está corrompido ou é ilegível.")
+            ctx.raise_if_any()
+
+        if total_paginas > MAXIMO_PAGINAS_PDF:
+            ctx = NotificationContext()
+            ctx.add(1008, "documento", f"O PDF excede o limite de {MAXIMO_PAGINAS_PDF} páginas.")
+            ctx.raise_if_any()
+
+        try:
+            amostra_pdf = amostrar_paginas(documento.file)
         except ValueError:
             ctx = NotificationContext()
             ctx.add(1006, "documento", "O arquivo PDF está corrompido ou é ilegível.")
             ctx.raise_if_any()
 
-        if not texto:
-            logger.warning("PDF sem texto extraível (provavelmente escaneado): upload recusado.")
-            ctx = NotificationContext()
-            ctx.add(
-                1007,
-                "documento",
-                "Não foi possível extrair texto deste PDF. Envie um PDF com texto selecionável "
-                "(não escaneado nem impresso como imagem).",
-            )
-            ctx.raise_if_any()
-
         try:
-            improprio, motivo = self.bedrock_service.moderar_conteudo(texto)
+            improprio, motivo = self.bedrock_service.moderar_conteudo(amostra_pdf)
         except AiGenerationError as exc:
             logger.error(f"Moderação de conteúdo indisponível, upload bloqueado: {exc}")
             raise ModeracaoIndisponivelError() from exc

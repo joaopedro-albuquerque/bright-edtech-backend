@@ -1,3 +1,4 @@
+import base64
 import io
 import json
 from unittest.mock import MagicMock
@@ -9,6 +10,9 @@ from google.genai import errors as genai_errors
 from app.core.exceptions import AiGenerationError
 from app.services import BedrockService as bedrock_module
 from app.services.BedrockService import BedrockService
+
+
+PDF = b"%PDF-1.4 conteudo"
 
 
 def _fake_stream_body(payload: dict):
@@ -73,7 +77,7 @@ class TestInvocarBedrock:
             "body": _fake_stream_body({"content": [{"text": "resposta"}], "usage": {"input_tokens": 10, "output_tokens": 5}})
         }
 
-        texto, tokens = service._invocar_bedrock("modelo-x", "prompt", "chunk", 100, 3, 0, 1)
+        texto, tokens = service._invocar_bedrock("modelo-x", "prompt", PDF, "instrucao", 100, 3)
 
         assert texto == "resposta"
         assert tokens == 15
@@ -82,7 +86,7 @@ class TestInvocarBedrock:
         service.bedrock_client.invoke_model.side_effect = _client_error("acesso negado")
 
         with pytest.raises(ClientError):
-            service._invocar_bedrock("modelo-x", "prompt", "chunk", 100, 3, 0, 1)
+            service._invocar_bedrock("modelo-x", "prompt", PDF, "instrucao", 100, 3)
 
     def test_throttling_tenta_novamente_e_sucede_na_segunda_tentativa(self, service):
         sucesso = {
@@ -90,7 +94,7 @@ class TestInvocarBedrock:
         }
         service.bedrock_client.invoke_model.side_effect = [_throttling_client_error(), sucesso]
 
-        texto, tokens = service._invocar_bedrock("modelo-x", "prompt", "chunk", 100, 3, 0, 1)
+        texto, tokens = service._invocar_bedrock("modelo-x", "prompt", PDF, "instrucao", 100, 3)
 
         assert texto == "ok"
         assert service.bedrock_client.invoke_model.call_count == 2
@@ -99,13 +103,13 @@ class TestInvocarBedrock:
         service.bedrock_client.invoke_model.side_effect = _throttling_client_error()
 
         with pytest.raises(ClientError):
-            service._invocar_bedrock("modelo-x", "prompt", "chunk", 100, 3, 0, 1)
+            service._invocar_bedrock("modelo-x", "prompt", PDF, "instrucao", 100, 3)
 
         assert service.bedrock_client.invoke_model.call_count == 3
 
     def test_max_retentativas_zero_levanta_ai_generation_error(self, service):
         with pytest.raises(AiGenerationError, match="após 0 tentativas"):
-            service._invocar_bedrock("modelo-x", "prompt", "chunk", 100, 0, 0, 1)
+            service._invocar_bedrock("modelo-x", "prompt", PDF, "instrucao", 100, 0)
 
 
 class TestInvocarGemini:
@@ -113,7 +117,7 @@ class TestInvocarGemini:
         resposta = _resposta_gemini("texto gerado", prompt_tokens=10, candidates_tokens=5)
         service.gemini_client.models.generate_content.return_value = resposta
 
-        texto, tokens = service._invocar_gemini("prompt", "chunk", 100, 3, 0, 1)
+        texto, tokens = service._invocar_gemini("prompt", PDF, "instrucao", 100, 3)
 
         assert texto == "texto gerado"
         assert tokens == 15
@@ -122,13 +126,13 @@ class TestInvocarGemini:
         service.gemini_client.models.generate_content.side_effect = _genai_fatal_error()
 
         with pytest.raises(genai_errors.ClientError):
-            service._invocar_gemini("prompt", "chunk", 100, 3, 0, 1)
+            service._invocar_gemini("prompt", PDF, "instrucao", 100, 3)
 
     def test_throttling_tenta_novamente_e_sucede(self, service):
         resposta = _resposta_gemini("ok", prompt_tokens=1, candidates_tokens=1)
         service.gemini_client.models.generate_content.side_effect = [_genai_throttling_error(), resposta]
 
-        texto, tokens = service._invocar_gemini("prompt", "chunk", 100, 3, 0, 1)
+        texto, tokens = service._invocar_gemini("prompt", PDF, "instrucao", 100, 3)
 
         assert texto == "ok"
 
@@ -136,18 +140,18 @@ class TestInvocarGemini:
         service.gemini_client.models.generate_content.side_effect = _genai_throttling_error()
 
         with pytest.raises(genai_errors.ClientError):
-            service._invocar_gemini("prompt", "chunk", 100, 3, 0, 1)
+            service._invocar_gemini("prompt", PDF, "instrucao", 100, 3)
 
     def test_max_retentativas_zero_levanta_ai_generation_error(self, service):
         with pytest.raises(AiGenerationError, match="após 0 tentativas"):
-            service._invocar_gemini("prompt", "chunk", 100, 0, 0, 1)
+            service._invocar_gemini("prompt", PDF, "instrucao", 100, 0)
 
 
 class TestInvocarModelo:
-    def test_usa_bedrock_quando_disponivel_em_chunk_unico(self, service, mocker):
+    def test_usa_bedrock_quando_disponivel(self, service, mocker):
         mocker.patch.object(service, "_invocar_bedrock", return_value=("resposta bedrock", 20))
 
-        texto, tokens, modelo = service._invocar_modelo("modelo-bedrock", "system", "texto curto", 100)
+        texto, tokens, modelo = service._invocar_modelo("modelo-bedrock", "system", PDF, "instrucao", 100)
 
         assert texto == "resposta bedrock"
         assert tokens == 20
@@ -157,7 +161,7 @@ class TestInvocarModelo:
         mocker.patch.object(service, "_invocar_bedrock", side_effect=Exception("bedrock indisponível"))
         mocker.patch.object(service, "_invocar_gemini", return_value=("resposta gemini", 5))
 
-        texto, tokens, modelo = service._invocar_modelo("modelo-bedrock", "system", "texto", 100)
+        texto, tokens, modelo = service._invocar_modelo("modelo-bedrock", "system", PDF, "instrucao", 100)
 
         assert texto == "resposta gemini"
         assert modelo == service.modelo_fallback
@@ -167,19 +171,56 @@ class TestInvocarModelo:
         mocker.patch.object(service, "_invocar_gemini", side_effect=Exception("gemini down"))
 
         with pytest.raises(AiGenerationError, match="Falha ao invocar IA"):
-            service._invocar_modelo("modelo-bedrock", "system", "texto", 100)
+            service._invocar_modelo("modelo-bedrock", "system", PDF, "instrucao", 100)
 
-    def test_concatena_respostas_de_multiplos_chunks(self, service, mocker):
-        invocar_spy = mocker.patch.object(
-            service, "_invocar_bedrock", side_effect=[("parte1", 10), ("parte2", 10)]
-        )
-        texto_grande = "a" * 25000
+    def test_faz_uma_unica_chamada_por_documento_sem_dividir_em_blocos(self, service, mocker):
+        invocar = mocker.patch.object(service, "_invocar_bedrock", return_value=("ok", 10))
 
-        texto, tokens, _ = service._invocar_modelo("modelo-bedrock", "system", texto_grande, 100)
+        service._invocar_modelo("modelo-bedrock", "system", b"x" * 500_000, "instrucao", 100)
 
-        assert texto == "parte1\n\nparte2"
-        assert tokens == 20
-        assert invocar_spy.call_count == 2
+        assert invocar.call_count == 1
+
+
+class TestEnvioDoPdfNativo:
+    def test_bedrock_recebe_o_pdf_como_bloco_document_em_base64(self, service):
+        service.bedrock_client.invoke_model.return_value = {
+            "body": _fake_stream_body({"content": [{"text": "ok"}], "usage": {}})
+        }
+
+        service._invocar_bedrock("modelo-x", "prompt", PDF, "instrucao", 100, 3)
+
+        body = json.loads(service.bedrock_client.invoke_model.call_args.kwargs["body"])
+        conteudo = body["messages"][0]["content"]
+        assert conteudo[0]["type"] == "document"
+        assert conteudo[0]["source"] == {
+            "type": "base64",
+            "media_type": "application/pdf",
+            "data": base64.b64encode(PDF).decode("ascii"),
+        }
+        assert conteudo[1] == {"type": "text", "text": "instrucao"}
+        assert body["system"] == "prompt"
+        assert body["max_tokens"] == 100
+
+    def test_gemini_recebe_o_pdf_como_parte_com_mime_type_pdf(self, service):
+        service.gemini_client.models.generate_content.return_value = _resposta_gemini("ok", 1, 1)
+
+        service._invocar_gemini("prompt", PDF, "instrucao", 100, 3)
+
+        contents = service.gemini_client.models.generate_content.call_args.kwargs["contents"]
+        assert contents[0].inline_data.data == PDF
+        assert contents[0].inline_data.mime_type == "application/pdf"
+        assert contents[1] == "instrucao"
+
+
+class TestMaxTokensProporcional:
+    def test_quantidade_pequena_usa_o_piso(self):
+        assert bedrock_module._max_tokens_para_itens(5, bedrock_module.TOKENS_POR_FLASHCARD) == 4096
+
+    def test_quantidade_maxima_de_quiz_excede_o_piso_antigo(self):
+        assert bedrock_module._max_tokens_para_itens(50, bedrock_module.TOKENS_POR_QUESTAO) > 4096
+
+    def test_nunca_passa_do_teto(self):
+        assert bedrock_module._max_tokens_para_itens(10_000, 1000) == bedrock_module.TOKENS_MAXIMO_SAIDA
 
 
 class TestParsearJsonLista:
@@ -207,25 +248,41 @@ class TestGerarConteudo:
     def test_gerar_resumo_delega_para_invocar_modelo_com_modelo_de_resumo(self, service, mocker):
         mocker.patch.object(service, "_invocar_modelo", return_value=("texto", 10, "modelo-x"))
 
-        texto, tokens, modelo = service.gerar_resumo("conteudo", "cornell", 5, "formal")
+        texto, tokens, modelo = service.gerar_resumo(PDF, "cornell", 5, "formal")
 
         assert texto == "texto"
         chamada = service._invocar_modelo.call_args
         assert chamada.kwargs["modelo_bedrock"] == service.modelo_resumo
+        assert chamada.kwargs["pdf_bytes"] == PDF
+
+    def test_gerar_resumo_pede_para_considerar_conteudo_visual(self, service, mocker):
+        mocker.patch.object(service, "_invocar_modelo", return_value=("texto", 10, "modelo-x"))
+
+        service.gerar_resumo(PDF, "cornell", 5, "formal")
+
+        assert "figuras, gráficos, tabelas" in service._invocar_modelo.call_args.kwargs["system_prompt"]
 
     def test_gerar_flashcards_delega_e_parseia_json(self, service, mocker):
         mocker.patch.object(service, "_invocar_modelo", return_value=('[{"item_ref": "card_001"}]', 10, "modelo-x"))
 
-        cartoes, tokens, modelo = service.gerar_flashcards("texto", 5, "facil")
+        cartoes, tokens, modelo = service.gerar_flashcards(PDF, 5, "facil")
 
         assert cartoes == [{"item_ref": "card_001"}]
+        assert service._invocar_modelo.call_args.kwargs["pdf_bytes"] == PDF
 
     def test_gerar_quiz_delega_e_parseia_json(self, service, mocker):
         mocker.patch.object(service, "_invocar_modelo", return_value=('[{"item_ref": "q_001"}]', 10, "modelo-x"))
 
-        questoes, tokens, modelo = service.gerar_quiz("texto", 5, "dificil")
+        questoes, tokens, modelo = service.gerar_quiz(PDF, 5, "dificil")
 
         assert questoes == [{"item_ref": "q_001"}]
+
+    def test_quantidade_maxima_recebe_mais_tokens_de_saida_que_o_limite_antigo(self, service, mocker):
+        mocker.patch.object(service, "_invocar_modelo", return_value=("[]", 10, "modelo-x"))
+
+        service.gerar_quiz(PDF, 50, "medio")
+
+        assert service._invocar_modelo.call_args.kwargs["max_tokens"] > 4096
 
 
 class TestModerarConteudo:
@@ -235,7 +292,7 @@ class TestModerarConteudo:
     def test_veredito_improprio_retorna_true_e_motivo(self, service, mocker):
         self._mock_invocar(service, mocker, '{"improprio": true, "motivo": "conteúdo sexual explícito"}')
 
-        improprio, motivo = service.moderar_conteudo("texto qualquer")
+        improprio, motivo = service.moderar_conteudo(PDF)
 
         assert improprio is True
         assert motivo == "conteúdo sexual explícito"
@@ -243,14 +300,14 @@ class TestModerarConteudo:
     def test_veredito_proprio_retorna_false(self, service, mocker):
         self._mock_invocar(service, mocker, '{"improprio": false, "motivo": "material didático"}')
 
-        improprio, _ = service.moderar_conteudo("texto de biologia")
+        improprio, _ = service.moderar_conteudo(PDF)
 
         assert improprio is False
 
     def test_aceita_resposta_dentro_de_bloco_de_codigo(self, service, mocker):
         self._mock_invocar(service, mocker, '```json\n{"improprio": false, "motivo": ""}\n```')
 
-        improprio, _ = service.moderar_conteudo("texto")
+        improprio, _ = service.moderar_conteudo(PDF)
 
         assert improprio is False
 
@@ -264,34 +321,23 @@ class TestModerarConteudo:
         self._mock_invocar(service, mocker, resposta)
 
         with pytest.raises(AiGenerationError):
-            service.moderar_conteudo("texto")
+            service.moderar_conteudo(PDF)
 
     def test_falha_da_ia_propaga_ai_generation_error(self, service, mocker):
         mocker.patch.object(service, "_invocar_modelo", side_effect=AiGenerationError("fora do ar"))
 
         with pytest.raises(AiGenerationError):
-            service.moderar_conteudo("texto")
+            service.moderar_conteudo(PDF)
 
-    def test_envia_texto_dentro_da_tag_documento_com_prompt_de_moderacao(self, service, mocker):
+    def test_envia_o_pdf_com_prompt_de_moderacao(self, service, mocker):
         mock = self._mock_invocar(service, mocker, '{"improprio": false}')
 
-        service.moderar_conteudo("conteudo do pdf")
+        service.moderar_conteudo(PDF)
 
         kwargs = mock.call_args.kwargs
-        assert kwargs["user_content"] == "<documento>\nconteudo do pdf\n</documento>"
+        assert kwargs["pdf_bytes"] == PDF
         assert kwargs["system_prompt"] == bedrock_module.SYSTEM_PROMPT_MODERACAO
         assert kwargs["max_tokens"] == 200
 
-    def test_texto_curto_e_enviado_inteiro(self):
-        assert BedrockService._amostrar_texto("curto") == "curto"
-
-    def test_texto_longo_e_amostrado_com_inicio_meio_e_fim(self):
-        tam = bedrock_module.TAMANHO_AMOSTRA_MODERACAO
-        texto = "A" * tam + "B" * (4 * tam) + "C" * tam
-
-        amostra = BedrockService._amostrar_texto(texto)
-
-        assert len(amostra) < len(texto)
-        assert amostra.startswith("A" * tam)
-        assert amostra.endswith("C" * tam)
-        assert "B" in amostra
+    def test_prompt_de_moderacao_cobre_imagens(self):
+        assert "imagens" in bedrock_module.SYSTEM_PROMPT_MODERACAO

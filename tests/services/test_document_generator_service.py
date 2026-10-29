@@ -32,11 +32,12 @@ def bedrock_service(mocker):
 
 
 @pytest.fixture(autouse=True)
-def texto_do_pdf(mocker):
-    return mocker.patch(
-        "app.services.DocumentGeneratorService.extrair_texto_do_pdf",
-        return_value="texto de estudo sobre biologia celular",
+def pdf_utils(mocker):
+    contar = mocker.patch("app.services.DocumentGeneratorService.contar_paginas", return_value=3)
+    amostrar = mocker.patch(
+        "app.services.DocumentGeneratorService.amostrar_paginas", return_value=b"pdf-amostra"
     )
+    return SimpleNamespace(contar=contar, amostrar=amostrar)
 
 
 @pytest.fixture
@@ -157,27 +158,79 @@ class TestModeracaoDeConteudo:
         self._assert_nada_foi_salvo(document_repo, s3_service)
 
     def test_pdf_ilegivel_levanta_validation_notification_error(
-        self, service, texto_do_pdf, document_repo, s3_service
+        self, service, pdf_utils, bedrock_service, document_repo, s3_service
     ):
-        texto_do_pdf.side_effect = ValueError("O arquivo PDF está corrompido ou é ilegível.")
+        pdf_utils.contar.side_effect = ValueError("O arquivo PDF está corrompido ou é ilegível.")
 
         with pytest.raises(ValidationNotificationError) as exc_info:
             service.salvar_documento(_upload_file(), uuid4(), uuid4(), "Prova")
 
         assert exc_info.value.notifications[0].code == 1006
+        bedrock_service.moderar_conteudo.assert_not_called()
         self._assert_nada_foi_salvo(document_repo, s3_service)
 
-    def test_pdf_sem_texto_extraivel_e_recusado_sem_chamar_ia_nem_salvar(
-        self, service, texto_do_pdf, bedrock_service, document_repo, s3_service
+    def test_pdf_sem_paginas_e_tratado_como_ilegivel(
+        self, service, pdf_utils, bedrock_service, document_repo, s3_service
     ):
-        texto_do_pdf.return_value = ""
+        pdf_utils.contar.return_value = 0
 
         with pytest.raises(ValidationNotificationError) as exc_info:
             service.salvar_documento(_upload_file(), uuid4(), uuid4(), "Prova")
 
-        assert exc_info.value.notifications[0].code == 1007
+        assert exc_info.value.notifications[0].code == 1006
+        bedrock_service.moderar_conteudo.assert_not_called()
+
+    def test_falha_ao_amostrar_paginas_levanta_erro_de_pdf_ilegivel(
+        self, service, pdf_utils, bedrock_service, document_repo, s3_service
+    ):
+        pdf_utils.amostrar.side_effect = ValueError("O arquivo PDF está corrompido ou é ilegível.")
+
+        with pytest.raises(ValidationNotificationError) as exc_info:
+            service.salvar_documento(_upload_file(), uuid4(), uuid4(), "Prova")
+
+        assert exc_info.value.notifications[0].code == 1006
         bedrock_service.moderar_conteudo.assert_not_called()
         self._assert_nada_foi_salvo(document_repo, s3_service)
+
+    def test_pdf_acima_do_limite_de_paginas_e_recusado_sem_chamar_ia_nem_salvar(
+        self, service, pdf_utils, bedrock_service, document_repo, s3_service
+    ):
+        pdf_utils.contar.return_value = 101
+
+        with pytest.raises(ValidationNotificationError) as exc_info:
+            service.salvar_documento(_upload_file(), uuid4(), uuid4(), "Prova")
+
+        assert exc_info.value.notifications[0].code == 1008
+        bedrock_service.moderar_conteudo.assert_not_called()
+        self._assert_nada_foi_salvo(document_repo, s3_service)
+
+    def test_pdf_com_exatamente_o_limite_de_paginas_e_aceito(self, service, pdf_utils, document_repo, s3_service):
+        pdf_utils.contar.return_value = 100
+        document_repo.criar_documento.return_value = {"id": uuid4()}
+        document_repo.atualizar_chave_s3.return_value = {"id": uuid4()}
+
+        service.salvar_documento(_upload_file(), uuid4(), uuid4(), "Prova")
+
+        document_repo.criar_documento.assert_called_once()
+
+    def test_pdf_escaneado_sem_camada_de_texto_e_moderado_e_aceito(
+        self, service, bedrock_service, document_repo
+    ):
+        document_repo.criar_documento.return_value = {"id": uuid4()}
+        document_repo.atualizar_chave_s3.return_value = {"id": uuid4()}
+
+        service.salvar_documento(_upload_file(), uuid4(), uuid4(), "Prova")
+
+        bedrock_service.moderar_conteudo.assert_called_once()
+        document_repo.criar_documento.assert_called_once()
+
+    def test_moderacao_recebe_a_amostra_de_paginas_do_pdf(self, service, bedrock_service, document_repo):
+        document_repo.criar_documento.return_value = {"id": uuid4()}
+        document_repo.atualizar_chave_s3.return_value = {"id": uuid4()}
+
+        service.salvar_documento(_upload_file(), uuid4(), uuid4(), "Prova")
+
+        bedrock_service.moderar_conteudo.assert_called_once_with(b"pdf-amostra")
 
     def test_moderacao_so_roda_depois_da_validacao_do_arquivo(self, service, bedrock_service):
         with pytest.raises(ValidationNotificationError):

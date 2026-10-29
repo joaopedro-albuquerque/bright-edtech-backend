@@ -1,3 +1,4 @@
+import io
 from uuid import uuid4
 
 import pytest
@@ -35,15 +36,15 @@ class TestGerarQuiz:
     def test_com_sucesso_gera_e_persiste_quiz(
         self, service, document_repo, s3_service, bedrock_service, quiz_repo, mocker
     ):
-        mocker.patch("app.services.QuizService.extrair_texto_do_pdf", return_value="texto extraído")
         document_repo.buscar_chave_s3_por_documento_id_e_usuario.return_value = {"chave_s3": "doc.pdf"}
-        s3_service.download_file.return_value = b"pdf-bytes"
+        s3_service.download_file.return_value = io.BytesIO(b"pdf-bytes")
         bedrock_service.gerar_quiz.return_value = ([{"item_ref": "q_001"}], 100, "modelo-x")
         quiz_repo.criar_quiz_com_questoes.return_value = {"id": uuid4()}
 
         resultado = service.gerar_quiz(uuid4(), uuid4(), quantidade=5, dificuldade="facil")
 
         assert "id" in resultado
+        bedrock_service.gerar_quiz.assert_called_once_with(b"pdf-bytes", 5, "facil")
         s3_service.upload_json.assert_called_once()
 
     def test_quando_documento_nao_encontrado_levanta_document_not_found_error(self, service, document_repo):

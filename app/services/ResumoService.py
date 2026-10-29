@@ -7,7 +7,7 @@ from app.repositories.ResumoRepository import ResumoRepository
 from app.services.BedrockService import BedrockService
 from app.services.S3Service import S3Service
 from app.services.pdf_generator import gerar_pdf_de_markdown
-from app.services.pdf_utils import extrair_texto_do_pdf
+from app.services.pdf_utils import ler_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +34,10 @@ class ResumoService:
         if not documento or not documento.get("chave_s3"):
             raise DocumentNotFoundError("Documento não encontrado ou não pertence ao usuário.")
 
-        arquivo_pdf = self.s3_service.download_file(documento["chave_s3"])
-        texto_extraido = extrair_texto_do_pdf(arquivo_pdf)
+        pdf_bytes = ler_bytes(self.s3_service.download_file(documento["chave_s3"]))
 
         texto_gerado, tokens_utilizados, modelo_ia = self.bedrock_service.gerar_resumo(
-            texto_extraido, formato, nivel_conhecimento, tom
+            pdf_bytes, formato, nivel_conhecimento, tom
         )
 
         titulo = f"Resumo ({formato})"

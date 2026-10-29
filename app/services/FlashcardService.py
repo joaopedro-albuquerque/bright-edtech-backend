@@ -6,7 +6,7 @@ from app.repositories.DocumentRepository import DocumentRepository
 from app.repositories.FlashcardRepository import FlashcardRepository
 from app.services.BedrockService import BedrockService
 from app.services.S3Service import S3Service
-from app.services.pdf_utils import extrair_texto_do_pdf
+from app.services.pdf_utils import ler_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +31,10 @@ class FlashcardService:
         if not documento or not documento.get("chave_s3"):
             raise DocumentNotFoundError("Documento não encontrado ou não pertence ao usuário.")
 
-        arquivo_pdf = self.s3_service.download_file(documento["chave_s3"])
-        texto_extraido = extrair_texto_do_pdf(arquivo_pdf)
+        pdf_bytes = ler_bytes(self.s3_service.download_file(documento["chave_s3"]))
 
         cartoes_json, tokens_utilizados, modelo_ia = self.bedrock_service.gerar_flashcards(
-            texto_extraido, quantidade, dificuldade
+            pdf_bytes, quantidade, dificuldade
         )
 
         titulo = "Flashcards Gerados"

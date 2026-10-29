@@ -44,7 +44,7 @@ O backend é organizado em três sub-camadas: **Controllers** (roteamento HTTP /
 | **DashboardService** | Agrega visão geral de uso da plataforma (últimos resumos/flashcards/quizzes, totais). | `ProfileRepository`/`DashboardRepository` |
 | **DocumentGeneratorService** | Orquestra a criação de pastas, upload de documentos e o disparo da geração de artefatos (resumo, flashcard, quiz) a partir de um PDF. | `DocumentRepository`, `S3Service`, `IngestionService` |
 | **GenerativeAIService** | Abstrai a comunicação com o provedor de IA generativa. Na implementação (`BedrockService`), decide entre Amazon Bedrock (Claude) e Google Gemini (fallback), conforme disponibilidade/erro do provedor primário. | Amazon Bedrock (externo), Google Gemini (externo) |
-| **IngestionService** | Orquestra a ingestão de conteúdo: extração de texto do PDF (`pdf_utils.extrair_texto_do_pdf`), chamada ao `GenerativeAIService` e persistência do artefato gerado. Na implementação, essa responsabilidade está distribuída entre `ResumoService`, `FlashcardService` e `QuizService`, que seguem o mesmo fluxo (buscar PDF → extrair texto → gerar conteúdo → salvar no S3 → persistir metadados). | `S3Service`, `GenerativeAIService`, `DocumentRepository` |
+| **IngestionService** | Orquestra a ingestão de conteúdo: leitura do PDF em bytes (`pdf_utils.ler_bytes`), chamada ao `GenerativeAIService` e persistência do artefato gerado. Na implementação, essa responsabilidade está distribuída entre `ResumoService`, `FlashcardService` e `QuizService`, que seguem o mesmo fluxo (buscar PDF → enviar o PDF nativo ao modelo → gerar conteúdo → salvar no S3 → persistir metadados). | `S3Service`, `GenerativeAIService`, `DocumentRepository` |
 | **SpacedRepetitionService** | Implementa o algoritmo SM-2 (SuperMemo-2) de repetição espaçada: calcula fator de facilidade, intervalo e próxima data de revisão a partir da nota de qualidade (1–5) informada pelo usuário. | `RevisaoService` (orquestrador que também resolve o conteúdo no S3 e mistura cartões/questões pendentes) |
 | **S3Service** | Abstração de toda a lógica de comunicação com o AWS S3 (upload/download de PDFs, resumos em Markdown e flashcards/quizzes em JSON, geração de URLs pré-assinadas). | Amazon S3 (externo) |
 | **SecretManagerService** | Abstrai a obtenção de credenciais sensíveis (credenciais do banco de dados, chave de API do provedor de IA de fallback) fora do código-fonte. Na implementação atual, é realizada via **AWS Systems Manager Parameter Store (SSM)**, e não via AWS Secrets Manager propriamente dito, com parâmetros do tipo `SecureString` decriptados via KMS. O componente é carregado uma única vez por processo (cache em memória) e possui *fallback* para variáveis de ambiente caso o SSM esteja inacessível. | AWS SSM Parameter Store + KMS (externo) |
@@ -71,7 +71,7 @@ Todos os repositórios recebem a conexão de banco (`psycopg2`) por injeção de
 | Componente | Papel no sistema |
 |---|---|
 | **Amazon Cognito (IdP)** | Provedor de identidade: cadastro/login de usuários, emissão de token JWT consumido pelo front-end e, opcionalmente, validado pelo `ProfileController` (`GET /profile`). |
-| **Amazon Bedrock** | Provedor principal de IA generativa (modelos Claude) para geração de resumos, flashcards e quizzes a partir do texto extraído do PDF. |
+| **Amazon Bedrock** | Provedor principal de IA generativa (modelos Claude) para geração de resumos, flashcards e quizzes a partir do próprio PDF enviado ao modelo (texto e imagens). |
 | **S3** | Armazenamento de objetos: PDFs originais, resumos em Markdown e flashcards/quizzes em JSON. |
 | **AmazonSecretManager** (representado no diagrama) | Fonte de credenciais sensíveis. Implementado via AWS SSM Parameter Store (ver nota na seção de Services). |
 
@@ -137,8 +137,8 @@ sequenceDiagram
     Repo->>DB: SELECT<br/>(valida posse via usuario_id)
     Ing->>S3S: download_file(chave_s3)
     S3S->>S3: GetObject (PDF)
-    Ing->>Ing: extrair_texto_do_pdf(pdf)
-    Ing->>IA: gerar_resumo(texto, formato,<br/>nivel, tom)
+    Ing->>Ing: ler_bytes(pdf)
+    Ing->>IA: gerar_resumo(pdf_bytes, formato,<br/>nivel, tom)
     IA-->>Ing: texto gerado +<br/>tokens + modelo
     Ing->>S3S: upload_text(markdown,<br/>nova_chave)
     S3S->>S3: PutObject
@@ -148,7 +148,7 @@ sequenceDiagram
     DC-->>FE: 201 Created
 ```
 
-O mesmo padrão de colaboração (buscar PDF → extrair texto → chamar IA → salvar artefato no S3 → persistir metadados no banco) se repete para `FlashcardService` e `QuizService`, mudando apenas o *prompt* enviado ao `GenerativeAIService` e a tabela de destino (`flashcards`+`cartoes` ou `quizzes`+`questoes`).
+O mesmo padrão de colaboração (buscar PDF → enviar o PDF à IA → salvar artefato no S3 → persistir metadados no banco) se repete para `FlashcardService` e `QuizService`, mudando apenas o *prompt* enviado ao `GenerativeAIService` e a tabela de destino (`flashcards`+`cartoes` ou `quizzes`+`questoes`).
 
 ### 4.5.3 Consulta de conteúdo por documento (Document Hub)
 

@@ -78,3 +78,9 @@ class TestAmostrarPaginas:
     def test_arquivo_corrompido_levanta_value_error(self):
         with pytest.raises(ValueError, match="corrompido ou é ilegível"):
             amostrar_paginas(io.BytesIO(b"isto nao e um pdf valido"))
+
+    def test_falha_inesperada_ao_montar_a_amostra_vira_value_error(self, mocker):
+        mocker.patch("app.services.pdf_utils.PdfWriter", side_effect=RuntimeError("falha ao escrever"))
+
+        with pytest.raises(ValueError, match="corrompido ou é ilegível"):
+            amostrar_paginas(_pdf_com_paginas(3))

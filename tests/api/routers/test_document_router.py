@@ -316,7 +316,10 @@ class TestQuizzes:
 class TestBuscaDeDocumentos:
     def test_busca_retorna_200_com_itens_e_paginacao(self, client, document_service, usuario_id):
         document_service.buscar_documentos.return_value = {
-            "itens": [{"id": str(uuid4()), "nome": "Sono", "pasta_nome": "Saúde", "criado_em": "2026-01-01T00:00:00"}],
+            "itens": [{
+                "id": str(uuid4()), "nome": "Sono", "pasta_nome": "Semestre 6",
+                "pasta_caminho": "Faculdade › Semestre 6", "criado_em": "2026-01-01T00:00:00",
+            }],
             "total": 1,
             "tem_mais": False,
         }
@@ -324,7 +327,8 @@ class TestBuscaDeDocumentos:
         response = client.get("/documentos", params={"q": "sono", "limit": 10, "offset": 5})
 
         assert response.status_code == 200
-        assert response.json()["itens"][0]["pasta_nome"] == "Saúde"
+        assert response.json()["itens"][0]["pasta_nome"] == "Semestre 6"
+        assert response.json()["itens"][0]["pasta_caminho"] == "Faculdade › Semestre 6"
         document_service.buscar_documentos.assert_called_once_with(usuario_id, "sono", 10, 5)
 
     def test_busca_sem_parametros_usa_padroes(self, client, document_service, usuario_id):
@@ -373,3 +377,19 @@ class TestPdfInline:
         resumo_service.obter_pdf_bytes.side_effect = ResumoNotFoundError("Não encontrado.")
 
         assert client.get(f"/resumos/{uuid4()}/pdf").status_code == 404
+
+
+class TestHierarquiaDePastas:
+    def test_todas_as_pastas_expoem_o_pai_para_montar_a_arvore(self, client, document_service, usuario_id):
+        raiz, filha = uuid4(), uuid4()
+        document_service.listar_todas_pastas_por_usuario.return_value = [
+            {"id": raiz, "nome": "Faculdade", "pasta_pai_id": None, "criada_em": "2026-01-01T00:00:00"},
+            {"id": filha, "nome": "Semestre 6", "pasta_pai_id": raiz, "criada_em": "2026-01-02T00:00:00"},
+        ]
+
+        response = client.get(f"/pastas/user/{usuario_id}/todas")
+
+        assert response.status_code == 200
+        corpo = response.json()
+        assert corpo[0]["pasta_pai_id"] is None
+        assert corpo[1]["pasta_pai_id"] == str(raiz)

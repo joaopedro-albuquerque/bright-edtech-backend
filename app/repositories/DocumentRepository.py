@@ -113,23 +113,42 @@ class DocumentRepository:
     def buscar_documentos(self, usuario_id: UUID, termo: str, limit: int, offset: int) -> dict:
         try:
             with self.conn.cursor() as cursor:
-                filtro = f"""
-                    FROM documentos d
-                    LEFT JOIN pastas p ON p.id = d.pasta_id
-                    WHERE d.usuario_id = %s
-                      AND translate(lower(d.nome), '{_COM_ACENTO}', '{_SEM_ACENTO}')
-                          LIKE %s ESCAPE '{_CARACTER_ESCAPE}'
+                condicao = f"""
+                    d.usuario_id = %s
+                    AND translate(lower(d.nome), '{_COM_ACENTO}', '{_SEM_ACENTO}')
+                        LIKE %s ESCAPE '{_CARACTER_ESCAPE}'
                 """
                 padrao = montar_padrao_busca(termo)
 
+                # A árvore monta o caminho completo de cada pasta (ex.: "Faculdade › Semestre 6").
                 cursor.execute(
-                    f"SELECT d.id, d.nome, p.nome AS pasta_nome, d.criado_em {filtro} "
-                    "ORDER BY d.criado_em DESC, d.id LIMIT %s OFFSET %s;",
-                    (usuario_id, padrao, limit, offset),
+                    f"""
+                    WITH RECURSIVE arvore AS (
+                        SELECT id, nome::text AS caminho, 1 AS nivel
+                        FROM pastas
+                        WHERE usuario_id = %s AND pasta_pai_id IS NULL
+                        UNION ALL
+                        SELECT p.id, a.caminho || ' › ' || p.nome, a.nivel + 1
+                        FROM pastas p
+                        JOIN arvore a ON p.pasta_pai_id = a.id
+                        WHERE a.nivel < 20
+                    )
+                    SELECT d.id, d.nome, p.nome AS pasta_nome, a.caminho AS pasta_caminho, d.criado_em
+                    FROM documentos d
+                    LEFT JOIN pastas p ON p.id = d.pasta_id
+                    LEFT JOIN arvore a ON a.id = d.pasta_id
+                    WHERE {condicao}
+                    ORDER BY d.criado_em DESC, d.id
+                    LIMIT %s OFFSET %s;
+                    """,
+                    (usuario_id, usuario_id, padrao, limit, offset),
                 )
                 itens = cursor.fetchall()
 
-                cursor.execute(f"SELECT count(*) AS total {filtro};", (usuario_id, padrao))
+                cursor.execute(
+                    f"SELECT count(*) AS total FROM documentos d WHERE {condicao};",
+                    (usuario_id, padrao),
+                )
                 total = cursor.fetchone()["total"]
 
                 return {"itens": itens, "total": total}
@@ -154,7 +173,7 @@ class DocumentRepository:
         try:
             with self.conn.cursor() as cursor:
                 query = """
-                    SELECT id, nome, criada_em
+                    SELECT id, nome, pasta_pai_id, criada_em
                     FROM pastas
                     WHERE usuario_id = %s
                     ORDER BY criada_em DESC;

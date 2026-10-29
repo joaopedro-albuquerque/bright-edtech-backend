@@ -336,9 +336,20 @@ class TestBuscarDocumentos:
         repo.buscar_documentos(usuario_id, "Emoção", 10, 30)
 
         primeira, segunda = mock_cursor.execute.call_args_list
-        assert primeira.args[1] == (usuario_id, "%emocao%", 10, 30)
+        assert primeira.args[1] == (usuario_id, usuario_id, "%emocao%", 10, 30)
         assert segunda.args[1] == (usuario_id, "%emocao%")
         assert "d.usuario_id = %s" in primeira.args[0]
+
+    def test_consulta_monta_o_caminho_das_pastas_com_cte_recursiva_limitada(self, repo, mock_cursor):
+        mock_cursor.fetchall.return_value = []
+        mock_cursor.fetchone.return_value = {"total": 0}
+
+        repo.buscar_documentos(uuid4(), "", 20, 0)
+
+        consulta = mock_cursor.execute.call_args_list[0].args[0]
+        assert "WITH RECURSIVE arvore" in consulta
+        assert "pasta_caminho" in consulta
+        assert "a.nivel < 20" in consulta
 
     def test_quando_banco_falha_levanta_document_database_error(self, repo, mock_cursor):
         mock_cursor.execute.side_effect = Exception("falha")

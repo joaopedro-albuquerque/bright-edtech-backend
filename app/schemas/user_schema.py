@@ -73,6 +73,7 @@ class Pasta(PastaBase):
 class PastaListagemResponse(BaseModel):
     id: UUID
     nome: str
+    pasta_pai_id: UUID | None = None
     criada_em: datetime
 
     model_config = {"from_attributes": True}
@@ -100,6 +101,7 @@ class DocumentoBuscaItem(BaseModel):
     id: UUID
     nome: str
     pasta_nome: str | None = None
+    pasta_caminho: str | None = None
     criado_em: datetime
 
     model_config = {"from_attributes": True}

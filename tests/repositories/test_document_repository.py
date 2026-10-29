@@ -299,3 +299,49 @@ class TestDeletarDocumento:
             repo.deletar_documento(uuid4(), uuid4())
 
         mock_conn.rollback.assert_called_once()
+
+
+class TestMontarPadraoBusca:
+    def test_remove_acentos_e_caixa(self):
+        from app.repositories.DocumentRepository import montar_padrao_busca
+
+        assert montar_padrao_busca("  ANSIEDADE Emoção ") == "%ansiedade emocao%"
+
+    def test_neutraliza_caracteres_especiais_do_like(self):
+        from app.repositories.DocumentRepository import montar_padrao_busca
+
+        assert montar_padrao_busca("100%_ok!") == "%100!%!_ok!!%"
+
+    def test_termo_vazio_casa_com_tudo(self):
+        from app.repositories.DocumentRepository import montar_padrao_busca
+
+        assert montar_padrao_busca("") == "%%"
+
+
+class TestBuscarDocumentos:
+    def test_retorna_itens_e_total(self, repo, mock_cursor):
+        itens = [{"id": uuid4(), "nome": "Sono", "pasta_nome": "Saúde", "criado_em": "2026-01-01"}]
+        mock_cursor.fetchall.return_value = itens
+        mock_cursor.fetchone.return_value = {"total": 7}
+
+        resultado = repo.buscar_documentos(uuid4(), "sono", 20, 0)
+
+        assert resultado == {"itens": itens, "total": 7}
+
+    def test_envia_usuario_padrao_normalizado_e_paginacao_para_o_banco(self, repo, mock_cursor):
+        mock_cursor.fetchall.return_value = []
+        mock_cursor.fetchone.return_value = {"total": 0}
+        usuario_id = uuid4()
+
+        repo.buscar_documentos(usuario_id, "Emoção", 10, 30)
+
+        primeira, segunda = mock_cursor.execute.call_args_list
+        assert primeira.args[1] == (usuario_id, "%emocao%", 10, 30)
+        assert segunda.args[1] == (usuario_id, "%emocao%")
+        assert "d.usuario_id = %s" in primeira.args[0]
+
+    def test_quando_banco_falha_levanta_document_database_error(self, repo, mock_cursor):
+        mock_cursor.execute.side_effect = Exception("falha")
+
+        with pytest.raises(DocumentDatabaseError):
+            repo.buscar_documentos(uuid4(), "x", 20, 0)

@@ -155,3 +155,45 @@ class TestDeletarResumo:
 
         with pytest.raises(ResumoNotFoundError):
             service.deletar_resumo(uuid4(), uuid4())
+
+
+class TestObterPdfBytes:
+    def test_com_pdf_existente_baixa_do_s3_sem_regerar(self, service, resumo_repo, s3_service, mocker):
+        gerar = mocker.patch("app.services.ResumoService.gerar_pdf_de_markdown")
+        resumo_repo.buscar_por_id.return_value = {"s3_chave_pdf": "resumo.pdf"}
+        s3_service.download_file.return_value = io.BytesIO(b"%PDF-existente")
+
+        resultado = service.obter_pdf_bytes(uuid4(), uuid4())
+
+        assert resultado == b"%PDF-existente"
+        s3_service.download_file.assert_called_once_with("resumo.pdf")
+        gerar.assert_not_called()
+
+    def test_sem_pdf_gera_a_partir_do_markdown_salva_e_devolve(self, service, resumo_repo, s3_service, mocker):
+        mocker.patch("app.services.ResumoService.gerar_pdf_de_markdown", return_value=b"%PDF-novo")
+        resumo_id, usuario_id = uuid4(), uuid4()
+        resumo_repo.buscar_por_id.return_value = {
+            "s3_chave_pdf": None, "s3_chave": "resumo.md", "titulo": "T",
+            "documento_id": uuid4(), "formato": "cornell",
+        }
+        s3_service.download_text.return_value = "# markdown"
+        s3_service.build_artifact_key.return_value = "novo.pdf"
+        s3_service.download_file.return_value = io.BytesIO(b"%PDF-novo")
+
+        resultado = service.obter_pdf_bytes(resumo_id, usuario_id)
+
+        assert resultado == b"%PDF-novo"
+        s3_service.upload_bytes.assert_called_once_with(b"%PDF-novo", "novo.pdf", content_type="application/pdf")
+        resumo_repo.atualizar_s3_chave_pdf.assert_called_once_with(resumo_id, usuario_id, "novo.pdf")
+
+    def test_resumo_inexistente_levanta_resumo_not_found_error(self, service, resumo_repo):
+        resumo_repo.buscar_por_id.return_value = None
+
+        with pytest.raises(ResumoNotFoundError):
+            service.obter_pdf_bytes(uuid4(), uuid4())
+
+    def test_download_url_continua_funcionando_apos_refatoracao(self, service, resumo_repo, s3_service):
+        resumo_repo.buscar_por_id.return_value = {"s3_chave_pdf": "resumo.pdf"}
+        s3_service.generate_presigned_url.return_value = "https://s3/resumo.pdf"
+
+        assert service.obter_download_url(uuid4(), uuid4()) == "https://s3/resumo.pdf"

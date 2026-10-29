@@ -2,6 +2,19 @@ from uuid import UUID, uuid4
 
 from app.core.exceptions import DocumentDatabaseError
 
+_COM_ACENTO = "áàâãäéèêëíìîïóòôõöúùûüç"
+_SEM_ACENTO = "aaaaaeeeeiiiiooooouuuuc"
+_TRADUCAO_ACENTOS = str.maketrans(_COM_ACENTO, _SEM_ACENTO)
+_CARACTER_ESCAPE = "!"
+
+
+def montar_padrao_busca(termo: str) -> str:
+    """Termo -> padrão LIKE sem acento/caixa, com %, _ e o próprio escape neutralizados."""
+    normalizado = termo.strip().lower().translate(_TRADUCAO_ACENTOS)
+    for especial in (_CARACTER_ESCAPE, "%", "_"):
+        normalizado = normalizado.replace(especial, _CARACTER_ESCAPE + especial)
+    return f"%{normalizado}%"
+
 
 class DocumentRepository:
     def __init__(self, conn):
@@ -96,6 +109,32 @@ class DocumentRepository:
                 return cursor.fetchone()
         except Exception as e:
             raise DocumentDatabaseError("Erro no banco de dados ao buscar chave S3.") from e
+
+    def buscar_documentos(self, usuario_id: UUID, termo: str, limit: int, offset: int) -> dict:
+        try:
+            with self.conn.cursor() as cursor:
+                filtro = f"""
+                    FROM documentos d
+                    LEFT JOIN pastas p ON p.id = d.pasta_id
+                    WHERE d.usuario_id = %s
+                      AND translate(lower(d.nome), '{_COM_ACENTO}', '{_SEM_ACENTO}')
+                          LIKE %s ESCAPE '{_CARACTER_ESCAPE}'
+                """
+                padrao = montar_padrao_busca(termo)
+
+                cursor.execute(
+                    f"SELECT d.id, d.nome, p.nome AS pasta_nome, d.criado_em {filtro} "
+                    "ORDER BY d.criado_em DESC, d.id LIMIT %s OFFSET %s;",
+                    (usuario_id, padrao, limit, offset),
+                )
+                itens = cursor.fetchall()
+
+                cursor.execute(f"SELECT count(*) AS total {filtro};", (usuario_id, padrao))
+                total = cursor.fetchone()["total"]
+
+                return {"itens": itens, "total": total}
+        except Exception as e:
+            raise DocumentDatabaseError("Erro no banco de dados ao buscar documentos.") from e
 
     def listar_pastas_raiz_por_usuario(self, usuario_id: UUID, limit: int, offset: int) -> list:
         try:

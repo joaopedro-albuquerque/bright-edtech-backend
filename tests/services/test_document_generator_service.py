@@ -358,3 +358,51 @@ class TestDeletarPasta:
 
         with pytest.raises(DocumentNotFoundError):
             service.deletar_pasta(uuid4(), uuid4())
+
+
+class TestBuscarDocumentos:
+    def test_tem_mais_quando_ha_itens_alem_da_pagina(self, service, document_repo):
+        document_repo.buscar_documentos.return_value = {"itens": [{"id": uuid4()}], "total": 45}
+
+        resultado = service.buscar_documentos(uuid4(), "sono", 20, 20)
+
+        assert resultado["total"] == 45
+        assert resultado["tem_mais"] is True
+
+    def test_nao_tem_mais_na_ultima_pagina(self, service, document_repo):
+        document_repo.buscar_documentos.return_value = {"itens": [], "total": 40}
+
+        resultado = service.buscar_documentos(uuid4(), "", 20, 20)
+
+        assert resultado["tem_mais"] is False
+
+    def test_delega_termo_e_paginacao_ao_repositorio(self, service, document_repo):
+        document_repo.buscar_documentos.return_value = {"itens": [], "total": 0}
+        usuario_id = uuid4()
+
+        service.buscar_documentos(usuario_id, "chicago", 10, 5)
+
+        document_repo.buscar_documentos.assert_called_once_with(usuario_id, "chicago", 10, 5)
+
+
+class TestObterArquivoBytes:
+    def test_retorna_bytes_do_arquivo_do_s3(self, service, document_repo, s3_service):
+        import io
+
+        document_repo.buscar_chave_s3_por_documento_id_e_usuario.return_value = {"chave_s3": "doc.pdf"}
+        s3_service.download_file.return_value = io.BytesIO(b"%PDF-conteudo")
+
+        assert service.obter_arquivo_bytes(uuid4(), uuid4()) == b"%PDF-conteudo"
+        s3_service.download_file.assert_called_once_with("doc.pdf")
+
+    def test_documento_inexistente_levanta_document_not_found_error(self, service, document_repo):
+        document_repo.buscar_chave_s3_por_documento_id_e_usuario.return_value = None
+
+        with pytest.raises(DocumentNotFoundError):
+            service.obter_arquivo_bytes(uuid4(), uuid4())
+
+    def test_documento_sem_chave_s3_levanta_document_not_found_error(self, service, document_repo):
+        document_repo.buscar_chave_s3_por_documento_id_e_usuario.return_value = {"chave_s3": None}
+
+        with pytest.raises(DocumentNotFoundError):
+            service.obter_arquivo_bytes(uuid4(), uuid4())

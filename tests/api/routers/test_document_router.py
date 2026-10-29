@@ -311,3 +311,65 @@ class TestQuizzes:
         response = client.delete(f"/quizzes/{uuid4()}")
 
         assert response.status_code == 204
+
+
+class TestBuscaDeDocumentos:
+    def test_busca_retorna_200_com_itens_e_paginacao(self, client, document_service, usuario_id):
+        document_service.buscar_documentos.return_value = {
+            "itens": [{"id": str(uuid4()), "nome": "Sono", "pasta_nome": "Saúde", "criado_em": "2026-01-01T00:00:00"}],
+            "total": 1,
+            "tem_mais": False,
+        }
+
+        response = client.get("/documentos", params={"q": "sono", "limit": 10, "offset": 5})
+
+        assert response.status_code == 200
+        assert response.json()["itens"][0]["pasta_nome"] == "Saúde"
+        document_service.buscar_documentos.assert_called_once_with(usuario_id, "sono", 10, 5)
+
+    def test_busca_sem_parametros_usa_padroes(self, client, document_service, usuario_id):
+        document_service.buscar_documentos.return_value = {"itens": [], "total": 0, "tem_mais": False}
+
+        response = client.get("/documentos")
+
+        assert response.status_code == 200
+        document_service.buscar_documentos.assert_called_once_with(usuario_id, "", 20, 0)
+
+    @pytest.mark.parametrize("params", [{"limit": 0}, {"limit": 51}, {"offset": -1}, {"q": "x" * 101}])
+    def test_parametros_invalidos_retornam_422(self, client, params):
+        assert client.get("/documentos", params=params).status_code == 422
+
+
+class TestPdfInline:
+    def test_arquivo_do_documento_retorna_pdf_inline(self, client, document_service):
+        document_service.obter_arquivo_bytes.return_value = b"%PDF-1.4 conteudo"
+
+        response = client.get(f"/documentos/{uuid4()}/arquivo")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert response.headers["content-disposition"].startswith("inline")
+        assert response.content == b"%PDF-1.4 conteudo"
+
+    def test_arquivo_de_documento_inexistente_retorna_404(self, client, document_service):
+        document_service.obter_arquivo_bytes.side_effect = DocumentNotFoundError("Não encontrado.")
+
+        assert client.get(f"/documentos/{uuid4()}/arquivo").status_code == 404
+
+    def test_pdf_do_resumo_retorna_pdf_inline(self, client, resumo_service):
+        resumo_service.obter_pdf_bytes.return_value = b"%PDF-1.4 resumo"
+
+        response = client.get(f"/resumos/{uuid4()}/pdf")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert response.headers["content-disposition"].startswith("inline")
+        assert response.content == b"%PDF-1.4 resumo"
+        assert "no-store" in response.headers["cache-control"]
+
+    def test_pdf_de_resumo_inexistente_retorna_404(self, client, resumo_service):
+        from app.core.exceptions import ResumoNotFoundError
+
+        resumo_service.obter_pdf_bytes.side_effect = ResumoNotFoundError("Não encontrado.")
+
+        assert client.get(f"/resumos/{uuid4()}/pdf").status_code == 404

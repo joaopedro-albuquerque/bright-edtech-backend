@@ -121,6 +121,20 @@ class DocumentGeneratorService:
             "documento": documento_atualizado,
         }
 
+    def buscar_documentos(self, usuario_id: UUID, termo: str, limit: int, offset: int) -> dict:
+        resultado = self.document_repo.buscar_documentos(usuario_id, termo, limit, offset)
+        return {
+            "itens": resultado["itens"],
+            "total": resultado["total"],
+            "tem_mais": (offset + limit) < resultado["total"],
+        }
+
+    def obter_arquivo_bytes(self, documento_id: UUID, usuario_id: UUID) -> bytes:
+        documento = self.document_repo.buscar_chave_s3_por_documento_id_e_usuario(documento_id, usuario_id)
+        if not documento or not documento.get("chave_s3"):
+            raise DocumentNotFoundError("Documento não encontrado ou não pertence ao usuário.")
+        return self.s3_service.download_file(documento["chave_s3"]).read()
+
     def gerar_pre_signed_url_visualizacao(self, documento_id: UUID, usuario_id: UUID) -> str:
         logger.info(f"Solicitando Pre-Signed URL. Doc: {documento_id} | User: {usuario_id}")
         documento = self.document_repo.buscar_chave_s3_por_documento_id_e_usuario(

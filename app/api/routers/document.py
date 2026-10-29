@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 
 from app.api.dependencies import (
     get_current_user_id,
@@ -27,7 +27,13 @@ from app.schemas.resumo_schema import (
     ResumoRenomearRequest,
     ResumoResponse,
 )
-from app.schemas.user_schema import Pasta, PastaConteudoResponse, PastaCreateRequest, PastaListagemResponse
+from app.schemas.user_schema import (
+    DocumentoBuscaResponse,
+    Pasta,
+    PastaConteudoResponse,
+    PastaCreateRequest,
+    PastaListagemResponse,
+)
 from app.services.DocumentGeneratorService import DocumentGeneratorService
 from app.services.FlashcardService import FlashcardService
 from app.services.QuizService import QuizService
@@ -121,6 +127,37 @@ def salvar_documento(
     return service.salvar_documento(documento, pasta_id, usuario_id, nome_documento)
 
 
+@documentos_router.get("", response_model=DocumentoBuscaResponse, status_code=status.HTTP_200_OK)
+def buscar_documentos(
+    q: str = Query("", max_length=100),
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: DocumentGeneratorService = Depends(get_document_generator_service),
+):
+    return service.buscar_documentos(usuario_id, q, limit, offset)
+
+
+def _resposta_pdf(conteudo: bytes, nome_arquivo: str) -> Response:
+    return Response(
+        content=conteudo,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{nome_arquivo}"',
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
+@documentos_router.get("/{documento_id}/arquivo", status_code=status.HTTP_200_OK)
+def obter_arquivo_documento(
+    documento_id: UUID,
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: DocumentGeneratorService = Depends(get_document_generator_service),
+) -> Response:
+    return _resposta_pdf(service.obter_arquivo_bytes(documento_id, usuario_id), "documento.pdf")
+
+
 @documentos_router.get("/{documento_id}/url-visualizacao", status_code=status.HTTP_200_OK)
 def obter_url_visualizacao(
     documento_id: UUID,
@@ -192,6 +229,15 @@ def obter_conteudo_resumo(
     service: ResumoService = Depends(get_resumo_service),
 ):
     return service.obter_conteudo(resumo_id, usuario_id)
+
+
+@resumos_router.get("/{resumo_id}/pdf", status_code=status.HTTP_200_OK)
+def obter_pdf_resumo(
+    resumo_id: UUID,
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: ResumoService = Depends(get_resumo_service),
+) -> Response:
+    return _resposta_pdf(service.obter_pdf_bytes(resumo_id, usuario_id), "resumo.pdf")
 
 
 @resumos_router.get("/{resumo_id}/download", status_code=status.HTTP_200_OK)

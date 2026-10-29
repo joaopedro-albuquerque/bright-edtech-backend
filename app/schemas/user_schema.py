@@ -94,3 +94,18 @@ class PastaConteudoResponse(BaseModel):
     total_arquivos: int
     pagina_atual: int
     tem_mais_paginas: bool
+
+
+class DocumentoBuscaItem(BaseModel):
+    id: UUID
+    nome: str
+    pasta_nome: str | None = None
+    criado_em: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DocumentoBuscaResponse(BaseModel):
+    itens: list[DocumentoBuscaItem]
+    total: int
+    tem_mais: bool

@@ -76,11 +76,14 @@ class ResumoService:
         texto = self.s3_service.download_text(resumo["s3_chave"])
         return {"id": resumo["id"], "titulo": resumo["titulo"], "conteudo": texto}
 
-    def obter_download_url(self, resumo_id: UUID, usuario_id: UUID) -> str:
+    def _buscar_resumo(self, resumo_id: UUID, usuario_id: UUID) -> dict:
         resumo = self.resumo_repo.buscar_por_id(resumo_id, usuario_id)
         if not resumo:
             raise ResumoNotFoundError("Resumo não encontrado ou não pertence ao usuário.")
+        return resumo
 
+    def _garantir_pdf(self, resumo: dict, resumo_id: UUID, usuario_id: UUID) -> str:
+        """Chave S3 do PDF do resumo; gera o PDF a partir do markdown se ainda não existir."""
         s3_chave_pdf = resumo.get("s3_chave_pdf")
         if not s3_chave_pdf:
             texto_markdown = self.s3_service.download_text(resumo["s3_chave"])
@@ -90,8 +93,15 @@ class ResumoService:
             )
             self.s3_service.upload_bytes(pdf_bytes, s3_chave_pdf, content_type="application/pdf")
             self.resumo_repo.atualizar_s3_chave_pdf(resumo_id, usuario_id, s3_chave_pdf)
+        return s3_chave_pdf
 
-        return self.s3_service.generate_presigned_url(s3_chave_pdf)
+    def obter_download_url(self, resumo_id: UUID, usuario_id: UUID) -> str:
+        resumo = self._buscar_resumo(resumo_id, usuario_id)
+        return self.s3_service.generate_presigned_url(self._garantir_pdf(resumo, resumo_id, usuario_id))
+
+    def obter_pdf_bytes(self, resumo_id: UUID, usuario_id: UUID) -> bytes:
+        resumo = self._buscar_resumo(resumo_id, usuario_id)
+        return self.s3_service.download_file(self._garantir_pdf(resumo, resumo_id, usuario_id)).read()
 
     def renomear_resumo(self, resumo_id: UUID, usuario_id: UUID, titulo: str) -> dict:
         resultado = self.resumo_repo.atualizar_titulo(resumo_id, usuario_id, titulo)

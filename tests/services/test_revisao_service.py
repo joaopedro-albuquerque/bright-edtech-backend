@@ -161,3 +161,21 @@ class TestAvaliar:
 
         with pytest.raises(RevisaoNotFoundError):
             service.avaliar_cartao(uuid4(), uuid4(), qualidade=5)
+
+
+class TestListarLotes:
+    def test_flashcards_consulta_tabela_de_cartoes(self, service, revisao_repo):
+        usuario_id = uuid4()
+        revisao_repo.listar_lotes.return_value = [{"id": uuid4()}]
+
+        resultado = service.listar_lotes(usuario_id, "flashcards")
+
+        revisao_repo.listar_lotes.assert_called_once_with(usuario_id, "cartoes")
+        assert len(resultado) == 1
+
+    def test_quizzes_consulta_tabela_de_questoes(self, service, revisao_repo):
+        usuario_id = uuid4()
+
+        service.listar_lotes(usuario_id, "quizzes")
+
+        revisao_repo.listar_lotes.assert_called_once_with(usuario_id, "questoes")

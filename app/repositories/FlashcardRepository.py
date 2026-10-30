@@ -78,7 +78,9 @@ class FlashcardRepository:
         except Exception as e:
             raise FlashcardDatabaseError("Erro no banco de dados ao buscar flashcard.") from e
 
-    def listar_cartoes_por_flashcard(self, flashcard_id: UUID, usuario_id: UUID) -> list:
+    def listar_cartoes_por_flashcard(
+        self, flashcard_id: UUID, usuario_id: UUID, somente_vencidos: bool = False
+    ) -> list:
         try:
             with self.conn.cursor() as cursor:
                 query = """
@@ -86,9 +88,10 @@ class FlashcardRepository:
                            repeticoes, proxima_revisao
                     FROM cartoes
                     WHERE flashcard_id = %s AND usuario_id = %s
+                      AND (NOT %s OR proxima_revisao <= now())
                     ORDER BY item_ref ASC;
                 """
-                cursor.execute(query, (flashcard_id, usuario_id))
+                cursor.execute(query, (flashcard_id, usuario_id, somente_vencidos))
                 return [dict(row) for row in cursor.fetchall()]
         except Exception as e:
             raise FlashcardDatabaseError("Erro no banco de dados ao listar cartões do flashcard.") from e

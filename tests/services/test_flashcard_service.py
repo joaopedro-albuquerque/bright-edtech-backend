@@ -123,3 +123,15 @@ class TestDeletarFlashcard:
 
         with pytest.raises(FlashcardNotFoundError):
             service.deletar_flashcard(uuid4(), uuid4())
+
+
+class TestObterConteudoSomenteVencidos:
+    def test_repasse_do_filtro_ao_repositorio(self, service, flashcard_repo):
+        flashcard_id = uuid4()
+        usuario_id = uuid4()
+        flashcard_repo.buscar_por_id.return_value = {"id": flashcard_id, "titulo": "F", "s3_chave": "chave.json"}
+        flashcard_repo.listar_cartoes_por_flashcard.return_value = []
+
+        service.obter_conteudo(flashcard_id, usuario_id, somente_vencidos=True)
+
+        flashcard_repo.listar_cartoes_por_flashcard.assert_called_once_with(flashcard_id, usuario_id, True)

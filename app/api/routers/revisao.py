@@ -1,12 +1,28 @@
+from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.api.dependencies import get_current_user_id, get_revisao_service
-from app.schemas.revisao_schema import AvaliarRequest, AvaliarResponse, DailyMixResponse, ItemRevisaoResponse
+from app.schemas.revisao_schema import (
+    AvaliarRequest,
+    AvaliarResponse,
+    DailyMixResponse,
+    ItemRevisaoResponse,
+    LoteRevisaoResponse,
+)
 from app.services.RevisaoService import RevisaoService
 
 router = APIRouter(prefix="/revisoes", tags=["revisoes"])
+
+
+@router.get("/lotes", response_model=list[LoteRevisaoResponse], status_code=status.HTTP_200_OK)
+def listar_lotes_revisao(
+    tipo: Literal["flashcards", "quizzes"] = Query(...),
+    usuario_id: UUID = Depends(get_current_user_id),
+    service: RevisaoService = Depends(get_revisao_service),
+) -> list:
+    return service.listar_lotes(usuario_id, tipo)
 
 
 @router.get("/hoje", response_model=DailyMixResponse, status_code=status.HTTP_200_OK)

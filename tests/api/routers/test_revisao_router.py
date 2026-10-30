@@ -113,3 +113,30 @@ class TestAvaliarQuestao:
         response = client.put(f"/revisoes/questoes/{uuid4()}/avaliar", json={"qualidade": 4})
 
         assert response.status_code == 404
+
+
+class TestListarLotes:
+    def test_flashcards_retorna_200_com_lotes(self, client, revisao_service, usuario_id):
+        revisao_service.listar_lotes.return_value = [{
+            "id": str(uuid4()), "titulo": "Flashcards Gerados", "criado_em": "2026-10-29T10:00:00",
+            "documento_id": None, "documento_nome": None, "pasta_caminho": None,
+            "total_itens": 12, "itens_vencidos": 4, "proxima_revisao": None,
+        }]
+
+        response = client.get("/revisoes/lotes?tipo=flashcards")
+
+        assert response.status_code == 200
+        revisao_service.listar_lotes.assert_called_once_with(usuario_id, "flashcards")
+
+    def test_quizzes_repassa_tipo_ao_service(self, client, revisao_service, usuario_id):
+        revisao_service.listar_lotes.return_value = []
+
+        response = client.get("/revisoes/lotes?tipo=quizzes")
+
+        assert response.status_code == 200
+        revisao_service.listar_lotes.assert_called_once_with(usuario_id, "quizzes")
+
+    def test_tipo_invalido_retorna_422(self, client, revisao_service):
+        response = client.get("/revisoes/lotes?tipo=resumos")
+
+        assert response.status_code == 422

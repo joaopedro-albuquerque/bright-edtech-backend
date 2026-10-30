@@ -141,3 +141,13 @@ class TestDeletar:
             repo.deletar(uuid4(), uuid4())
 
         mock_conn.rollback.assert_called_once()
+
+
+class TestListarQuestoesSomenteVencidos:
+    def test_envia_o_filtro_de_vencidos_na_consulta(self, repo, mock_cursor):
+        quiz_id = uuid4()
+        usuario_id = uuid4()
+
+        repo.listar_questoes_por_quiz(quiz_id, usuario_id, somente_vencidos=True)
+
+        assert mock_cursor.execute.call_args[0][1] == (quiz_id, usuario_id, True)

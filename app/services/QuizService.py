@@ -56,12 +56,12 @@ class QuizService:
     def listar_por_documento(self, documento_id: UUID, usuario_id: UUID) -> list:
         return self.quiz_repo.listar_por_documento(documento_id, usuario_id)
 
-    def obter_conteudo(self, quiz_id: UUID, usuario_id: UUID) -> dict:
+    def obter_conteudo(self, quiz_id: UUID, usuario_id: UUID, somente_vencidos: bool = False) -> dict:
         quiz = self.quiz_repo.buscar_por_id(quiz_id, usuario_id)
         if not quiz:
             raise QuizNotFoundError("Quiz não encontrado ou não pertence ao usuário.")
 
-        questoes = self.quiz_repo.listar_questoes_por_quiz(quiz_id, usuario_id)
+        questoes = self.quiz_repo.listar_questoes_por_quiz(quiz_id, usuario_id, somente_vencidos)
 
         try:
             itens_json = self.s3_service.download_json(quiz["s3_chave"])

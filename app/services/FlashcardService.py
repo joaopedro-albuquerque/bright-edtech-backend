@@ -56,12 +56,12 @@ class FlashcardService:
     def listar_por_documento(self, documento_id: UUID, usuario_id: UUID) -> list:
         return self.flashcard_repo.listar_por_documento(documento_id, usuario_id)
 
-    def obter_conteudo(self, flashcard_id: UUID, usuario_id: UUID) -> dict:
+    def obter_conteudo(self, flashcard_id: UUID, usuario_id: UUID, somente_vencidos: bool = False) -> dict:
         flashcard = self.flashcard_repo.buscar_por_id(flashcard_id, usuario_id)
         if not flashcard:
             raise FlashcardNotFoundError("Flashcard não encontrado ou não pertence ao usuário.")
 
-        cartoes = self.flashcard_repo.listar_cartoes_por_flashcard(flashcard_id, usuario_id)
+        cartoes = self.flashcard_repo.listar_cartoes_por_flashcard(flashcard_id, usuario_id, somente_vencidos)
 
         try:
             itens_json = self.s3_service.download_json(flashcard["s3_chave"])

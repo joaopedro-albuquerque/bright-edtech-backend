@@ -8,6 +8,8 @@ from app.services.SpacedRepetitionService import SpacedRepetitionService
 
 logger = logging.getLogger(__name__)
 
+TABELA_POR_TIPO = {"flashcards": "cartoes", "quizzes": "questoes"}
+
 
 class RevisaoService:
     def __init__(
@@ -35,6 +37,10 @@ class RevisaoService:
 
     def buscar_quizzes_pendentes(self, usuario_id: UUID) -> list:
         return self._buscar_e_enriquecer(usuario_id, "questoes")
+
+    def listar_lotes(self, usuario_id: UUID, tipo: str) -> list:
+        tabela = TABELA_POR_TIPO[tipo]
+        return self.revisao_repo.listar_lotes(usuario_id, tabela)
 
     def buscar_flashcards_todos(self, usuario_id: UUID) -> list:
         return self._buscar_e_enriquecer(usuario_id, "cartoes", todos=True)

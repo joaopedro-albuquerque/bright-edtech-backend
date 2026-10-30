@@ -664,10 +664,10 @@ X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 
 ### 5.3 Ler conteúdo de um set de flashcards — `GET /flashcards/{flashcard_id}/conteudo`
 
-🔒 Auth: `X-User-Id` (header). Retorna **todos** os cartões do set, independente de estarem atrasados ou não (diferente do `/revisoes/*`, que só traz o que venceu).
+🔒 Auth: `X-User-Id` (header). Retorna **todos** os cartões do set, independente de estarem atrasados ou não (diferente do `/revisoes/*`, que só traz o que venceu). Com `?somente_vencidos=true` devolve só os cartões com `proxima_revisao <= agora` (usado pela Revisão Geral).
 
 ```
-GET /flashcards/e1000000-0000-0000-0000-000000000001/conteudo
+GET /flashcards/e1000000-0000-0000-0000-000000000001/conteudo?somente_vencidos=true
 X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 ```
 
@@ -745,7 +745,7 @@ X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 🔒 Auth: `X-User-Id` (header). Retorna **todas** as questões do quiz, independente de estarem atrasadas ou não.
 
 ```
-GET /quizzes/f1000000-0000-0000-0000-000000000001/conteudo
+GET /quizzes/f1000000-0000-0000-0000-000000000001/conteudo?somente_vencidos=true
 X-User-Id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
 ```
 
@@ -856,6 +856,33 @@ Mesmo formato do 7.2, mas **sem filtro de `proxima_revisao`** — traz todo o hi
 ### 7.3c Todas as questões (atrasadas + em dia) — `GET /revisoes/quizzes/todos`
 
 Mesmo formato do 7.3b, para questões de quiz.
+
+### 7.3d Lotes de revisão agrupáveis por documento — `GET /revisoes/lotes?tipo=flashcards|quizzes`
+
+Um item por flashcard (ou quiz), não por cartão. Usado pela tela Revisão Geral para agrupar por documento e pasta. Ordenado com os lotes que têm cartões vencidos primeiro (até 500).
+
+**Response `200 OK`** (`LoteRevisaoResponse[]`):
+```json
+[
+  {
+    "id": "e1000000-0000-0000-0000-000000000001",
+    "titulo": "Flashcards Gerados",
+    "criado_em": "2026-10-29T10:00:00",
+    "documento_id": "d1000000-0000-0000-0000-000000000001",
+    "documento_nome": "Aula 3 - Ética.pdf",
+    "pasta_caminho": "Faculdade › Semestre 1",
+    "total_itens": 12,
+    "itens_vencidos": 4,
+    "proxima_revisao": "2026-10-30T10:00:00"
+  }
+]
+```
+
+- `documento_id`, `documento_nome` e `pasta_caminho` são `null` quando o documento foi removido.
+- `itens_vencidos` conta os cartões com `proxima_revisao <= agora`.
+- `proxima_revisao` é a menor data entre os cartões do lote (`null` se não há cartões).
+
+**Erro:** `422` se `tipo` não for `flashcards` nem `quizzes`.
 
 ---
 

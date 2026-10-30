@@ -393,3 +393,21 @@ class TestHierarquiaDePastas:
         corpo = response.json()
         assert corpo[0]["pasta_pai_id"] is None
         assert corpo[1]["pasta_pai_id"] == str(raiz)
+
+
+class TestConteudoSomenteVencidos:
+    def test_flashcard_repassa_somente_vencidos_ao_service(self, client, flashcard_service):
+        flashcard_service.obter_conteudo.side_effect = DocumentNotFoundError("Não encontrado.")
+        flashcard_id = uuid4()
+
+        client.get(f"/flashcards/{flashcard_id}/conteudo?somente_vencidos=true")
+
+        assert flashcard_service.obter_conteudo.call_args[0][2] is True
+
+    def test_quiz_repassa_somente_vencidos_ao_service(self, client, quiz_service):
+        quiz_service.obter_conteudo.side_effect = DocumentNotFoundError("Não encontrado.")
+        quiz_id = uuid4()
+
+        client.get(f"/quizzes/{quiz_id}/conteudo?somente_vencidos=true")
+
+        assert quiz_service.obter_conteudo.call_args[0][2] is True

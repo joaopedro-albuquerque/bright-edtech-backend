@@ -121,3 +121,29 @@ class TestAtualizarEstado:
 
         with pytest.raises(RevisaoDatabaseError):
             repo.atualizar_estado(**self._kwargs())
+
+
+class TestListarLotes:
+    def test_retorna_lista_de_lotes(self, repo, mock_cursor):
+        mock_cursor.fetchall.return_value = [{"id": uuid4(), "itens_vencidos": 4}]
+
+        resultado = repo.listar_lotes(uuid4(), "cartoes")
+
+        assert len(resultado) == 1
+
+    def test_consulta_recebe_usuario_duas_vezes_e_limite(self, repo, mock_cursor):
+        usuario_id = uuid4()
+
+        repo.listar_lotes(usuario_id, "questoes", limit=10)
+
+        assert mock_cursor.execute.call_args[0][1] == (usuario_id, usuario_id, 10)
+
+    def test_levanta_value_error_quando_tabela_invalida(self, repo):
+        with pytest.raises(ValueError):
+            repo.listar_lotes(uuid4(), "tabela_invalida")
+
+    def test_quando_banco_falha_levanta_revisao_database_error(self, repo, mock_cursor):
+        mock_cursor.execute.side_effect = Exception("falha")
+
+        with pytest.raises(RevisaoDatabaseError):
+            repo.listar_lotes(uuid4(), "cartoes")

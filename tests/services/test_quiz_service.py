@@ -121,3 +121,15 @@ class TestDeletarQuiz:
 
         with pytest.raises(QuizNotFoundError):
             service.deletar_quiz(uuid4(), uuid4())
+
+
+class TestObterConteudoSomenteVencidos:
+    def test_repasse_do_filtro_ao_repositorio(self, service, quiz_repo):
+        quiz_id = uuid4()
+        usuario_id = uuid4()
+        quiz_repo.buscar_por_id.return_value = {"id": quiz_id, "titulo": "Q", "s3_chave": "chave.json"}
+        quiz_repo.listar_questoes_por_quiz.return_value = []
+
+        service.obter_conteudo(quiz_id, usuario_id, somente_vencidos=True)
+
+        quiz_repo.listar_questoes_por_quiz.assert_called_once_with(quiz_id, usuario_id, True)

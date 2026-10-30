@@ -4,7 +4,13 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.revisao_schema import AvaliarRequest, AvaliarResponse, DailyMixResponse, ItemRevisaoResponse
+from app.schemas.revisao_schema import (
+    AvaliarRequest,
+    AvaliarResponse,
+    DailyMixResponse,
+    ItemRevisaoResponse,
+    LoteRevisaoResponse,
+)
 
 
 class TestAvaliarRequest:
@@ -41,3 +47,24 @@ def test_avaliar_response_constroi_a_partir_de_dados_validos():
     )
 
     assert resultado.fator_facilidade == 2.6
+
+
+class TestLoteRevisaoResponse:
+    def test_aceita_lote_sem_documento(self):
+        lote = LoteRevisaoResponse(
+            id=uuid4(), titulo="Flashcards Gerados", criado_em=datetime.now(),
+            total_itens=12, itens_vencidos=4,
+        )
+
+        assert lote.documento_id is None
+        assert lote.proxima_revisao is None
+
+    def test_aceita_lote_com_documento_e_pasta(self):
+        lote = LoteRevisaoResponse(
+            id=uuid4(), titulo="Flashcards Gerados", criado_em=datetime.now(),
+            documento_id=uuid4(), documento_nome="Aula 3 - Ética.pdf",
+            pasta_caminho="Faculdade › Semestre 1", total_itens=12, itens_vencidos=4,
+            proxima_revisao=datetime.now(),
+        )
+
+        assert lote.pasta_caminho == "Faculdade › Semestre 1"

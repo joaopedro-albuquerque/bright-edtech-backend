@@ -19,6 +19,18 @@ class ItemRevisaoResponse(BaseModel):
     conteudo: dict | None = None
 
 
+class LoteRevisaoResponse(BaseModel):
+    id: UUID
+    titulo: str
+    criado_em: datetime
+    documento_id: UUID | None = None
+    documento_nome: str | None = None
+    pasta_caminho: str | None = None
+    total_itens: int
+    itens_vencidos: int
+    proxima_revisao: datetime | None = None
+
+
 class DailyMixResponse(BaseModel):
     cartoes: list[ItemRevisaoResponse]
     questoes: list[ItemRevisaoResponse]

@@ -301,10 +301,11 @@ def listar_flashcards_do_documento(
 )
 def obter_conteudo_flashcard(
     flashcard_id: UUID,
+    somente_vencidos: bool = Query(False),
     usuario_id: UUID = Depends(get_current_user_id),
     service: FlashcardService = Depends(get_flashcard_service),
 ):
-    return service.obter_conteudo(flashcard_id, usuario_id)
+    return service.obter_conteudo(flashcard_id, usuario_id, somente_vencidos)
 
 
 @flashcards_router.put("/{flashcard_id}", response_model=FlashcardResponse, status_code=status.HTTP_200_OK)
@@ -358,10 +359,11 @@ def listar_quizzes_do_documento(
 )
 def obter_conteudo_quiz(
     quiz_id: UUID,
+    somente_vencidos: bool = Query(False),
     usuario_id: UUID = Depends(get_current_user_id),
     service: QuizService = Depends(get_quiz_service),
 ):
-    return service.obter_conteudo(quiz_id, usuario_id)
+    return service.obter_conteudo(quiz_id, usuario_id, somente_vencidos)
 
 
 @quizzes_router.put("/{quiz_id}", response_model=QuizResponse, status_code=status.HTTP_200_OK)

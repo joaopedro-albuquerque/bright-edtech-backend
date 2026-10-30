@@ -78,7 +78,7 @@ class QuizRepository:
         except Exception as e:
             raise QuizDatabaseError("Erro no banco de dados ao buscar quiz.") from e
 
-    def listar_questoes_por_quiz(self, quiz_id: UUID, usuario_id: UUID) -> list:
+    def listar_questoes_por_quiz(self, quiz_id: UUID, usuario_id: UUID, somente_vencidos: bool = False) -> list:
         try:
             with self.conn.cursor() as cursor:
                 query = """
@@ -86,9 +86,10 @@ class QuizRepository:
                            repeticoes, proxima_revisao
                     FROM questoes
                     WHERE quiz_id = %s AND usuario_id = %s
+                      AND (NOT %s OR proxima_revisao <= now())
                     ORDER BY item_ref ASC;
                 """
-                cursor.execute(query, (quiz_id, usuario_id))
+                cursor.execute(query, (quiz_id, usuario_id, somente_vencidos))
                 return [dict(row) for row in cursor.fetchall()]
         except Exception as e:
             raise QuizDatabaseError("Erro no banco de dados ao listar questões do quiz.") from e

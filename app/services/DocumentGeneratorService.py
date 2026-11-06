@@ -51,7 +51,7 @@ class DocumentGeneratorService:
         ctx.raise_if_any()
 
     def _moderar_documento(self, documento) -> None:
-        """Bloqueia PDFs ilegíveis, longos demais e conteúdo sexual. Falha fechada: se a IA não responder, o upload é recusado."""
+        """Bloqueia PDFs ilegíveis, longos demais e conteúdo impróprio. Falha fechada: se a IA não responder, o upload é recusado."""
         try:
             total_paginas = contar_paginas(documento.file)
         except ValueError:

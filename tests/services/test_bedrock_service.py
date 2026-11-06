@@ -311,6 +311,25 @@ class TestModerarConteudo:
 
         assert improprio is False
 
+    def test_usa_o_prompt_de_moderacao_ampla(self, service, mocker):
+        invocar = self._mock_invocar(service, mocker, '{"improprio": false, "motivo": ""}')
+
+        service.moderar_conteudo(PDF)
+
+        assert invocar.call_args.kwargs["system_prompt"] == bedrock_module.SYSTEM_PROMPT_MODERACAO
+
+    @pytest.mark.parametrize("categoria", [
+        "sexual explícito",
+        "violência gráfica",
+        "discurso de ódio",
+        "atividades ilegais",
+    ])
+    def test_prompt_cobre_as_categorias_improprias(self, categoria):
+        assert categoria in bedrock_module.SYSTEM_PROMPT_MODERACAO
+
+    def test_prompt_preserva_o_material_educativo(self):
+        assert "NÃO é impróprio material educativo" in bedrock_module.SYSTEM_PROMPT_MODERACAO
+
     @pytest.mark.parametrize("resposta", [
         "isso não é json",
         '["improprio"]',

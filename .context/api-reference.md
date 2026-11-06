@@ -410,7 +410,7 @@ curl -X POST http://localhost:8000/documentos/upload \
 
 **Validações do upload** (todas antes de gravar no banco ou no S3):
 - `400` / `1003` — não é PDF; `1004` — acima de 5 MB (as duas podem vir juntas na lista de violações); `1006` — PDF corrompido ou ilegível; `1008` — PDF com mais de 100 páginas.
-- `422` / `1005` — conteúdo impróprio na moderação (feita sobre uma amostra de páginas: início, meio e fim, texto e imagens).
+- `422` / `1005` — conteúdo impróprio na moderação (feita sobre uma amostra de páginas: início, meio e fim, texto e imagens). Considera impróprio o conteúdo sexual explícito, a violência gráfica gratuita, o discurso de ódio e o conteúdo que promova atividades ilegais; material educativo, acadêmico, jornalístico ou técnico sobre esses temas é permitido.
 - `503` / `9004` — moderação indisponível (falha fechada: o upload é recusado).
 - PDFs escaneados (só imagem) são **aceitos**: o modelo lê as páginas como imagem.
 

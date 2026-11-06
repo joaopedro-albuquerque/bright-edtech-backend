@@ -1,0 +1,39 @@
+name: Derrubar Bastion
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  CLOUDFORMATION_STACK: cf-bright-ed-tech-bastion
+
+permissions:
+  contents: read
+
+jobs:
+  destroy:
+    name: Derrubar o bastion host (EC2)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configurar credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Excluir a stack do bastion
+        run: |
+          if aws cloudformation describe-stacks --stack-name "$CLOUDFORMATION_STACK" >/dev/null 2>&1; then
+            aws cloudformation delete-stack --stack-name "$CLOUDFORMATION_STACK"
+            echo "Exclusão disparada, aguardando terminar..."
+            aws cloudformation wait stack-delete-complete --stack-name "$CLOUDFORMATION_STACK"
+            echo "Stack do bastion excluída."
+          else
+            echo "Stack '$CLOUDFORMATION_STACK' não existe, nada a fazer."
+          fi
+
+      - name: Resumo
+        run: |
+          echo "Bastion derrubado. A regra de entrada no SG do RDS saiu junto com a stack."

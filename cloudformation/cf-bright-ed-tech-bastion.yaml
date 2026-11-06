@@ -1,0 +1,76 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Bastion host Bright EdTech: EC2 acessada via SSM Session Manager (sem SSH, sem porta aberta) para alcançar o RDS'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: 'prod-brightedtech'
+  InstanceType:
+    Type: String
+    Default: 't3.micro'
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64'
+
+Resources:
+  BastionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  BastionInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref BastionRole
+
+  # Sem regras de entrada: o acesso é só pelo SSM. A saída padrão (liberada)
+  # permite o agente do SSM (HTTPS) e a conexão com o RDS (5432).
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'Bastion host - sem entrada, acesso via SSM'
+      VpcId:
+        Fn::ImportValue: !Sub '${EnvironmentName}-VpcId'
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-bastion-sg'
+
+  # Libera o bastion no SG do RDS. Some junto com a stack ao derrubar.
+  RDSIngressFromBastion:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Fn::ImportValue: !Sub '${EnvironmentName}-RDSSecurityGroup'
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !Ref BastionSecurityGroup
+      Description: 'Bastion host para o RDS PostgreSQL'
+
+  BastionInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref BastionInstanceProfile
+      SubnetId:
+        Fn::ImportValue: !Sub '${EnvironmentName}-PublicSubnet1'
+      SecurityGroupIds:
+        - !Ref BastionSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-bastion'
+
+Outputs:
+  BastionInstanceId:
+    Value: !Ref BastionInstance
+    Description: 'ID da instância, usado no aws ssm start-session'

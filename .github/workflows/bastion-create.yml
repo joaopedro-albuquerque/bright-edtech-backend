@@ -1,0 +1,84 @@
+name: Criar Bastion
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_rds:
+        description: "Ligar o RDS se estiver parado"
+        type: boolean
+        default: true
+
+env:
+  AWS_REGION: us-east-1
+  CLOUDFORMATION_STACK: cf-bright-ed-tech-bastion
+  RDS_INSTANCE_ID: prod-brightedtech-postgres-db
+
+permissions:
+  contents: read
+
+jobs:
+  create:
+    name: Subir o bastion host (EC2)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Ligar o RDS (se estiver parado)
+        if: ${{ inputs.start_rds }}
+        run: |
+          STATUS=$(aws rds describe-db-instances \
+            --db-instance-identifier "$RDS_INSTANCE_ID" \
+            --query "DBInstances[0].DBInstanceStatus" --output text)
+          echo "Status atual do RDS: $STATUS"
+          if [ "$STATUS" = "stopped" ]; then
+            aws rds start-db-instance --db-instance-identifier "$RDS_INSTANCE_ID"
+            echo "Start disparado, aguardando ficar disponível..."
+            aws rds wait db-instance-available --db-instance-identifier "$RDS_INSTANCE_ID"
+            echo "RDS disponível."
+          else
+            echo "RDS já está em estado '$STATUS', nada a fazer."
+          fi
+
+      - name: Deploy da stack do bastion
+        run: |
+          aws cloudformation deploy \
+            --template-file cloudformation/cf-bright-ed-tech-bastion.yaml \
+            --stack-name "$CLOUDFORMATION_STACK" \
+            --parameter-overrides EnvironmentName=prod-brightedtech \
+            --capabilities CAPABILITY_IAM \
+            --no-fail-on-empty-changeset
+
+      - name: Aguardar o agente SSM ficar online
+        run: |
+          INSTANCE_ID=$(aws cloudformation describe-stacks \
+            --stack-name "$CLOUDFORMATION_STACK" \
+            --query "Stacks[0].Outputs[?OutputKey=='BastionInstanceId'].OutputValue" --output text)
+          echo "INSTANCE_ID=$INSTANCE_ID" >> "$GITHUB_ENV"
+          for i in $(seq 1 30); do
+            PING=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+              --query "InstanceInformationList[0].PingStatus" --output text)
+            echo "Tentativa $i: SSM = $PING"
+            [ "$PING" = "Online" ] && exit 0
+            sleep 10
+          done
+          echo "Agente SSM não ficou online a tempo." && exit 1
+
+      - name: Como conectar
+        run: |
+          RDS_HOST=$(aws rds describe-db-instances \
+            --db-instance-identifier "$RDS_INSTANCE_ID" \
+            --query "DBInstances[0].Endpoint.Address" --output text)
+          echo "Bastion online: $INSTANCE_ID"
+          echo "Rode na sua máquina (precisa do AWS CLI e do Session Manager plugin):"
+          echo "aws ssm start-session --target $INSTANCE_ID --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host=$RDS_HOST,portNumber=5432,localPortNumber=5433 --region $AWS_REGION"
+          echo "Depois conecte o cliente SQL em localhost:5433."

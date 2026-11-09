@@ -1,146 +1,262 @@
 <div align="center">
 
-# 💡 Bright EdTech — Backend
+# Bright EdTech API
 
-**Transforme qualquer PDF em resumo, flashcards e quiz com IA — e nunca mais esqueça o que estudou.**
+**API que sustenta a plataforma de estudo: organização de PDFs, geração de material com IA e agendamento de revisões.**
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)
 ![AWS](https://img.shields.io/badge/AWS-ECS%20%7C%20RDS%20%7C%20S3%20%7C%20Cognito-FF9900?logo=amazonaws&logoColor=white)
-![Testes](https://img.shields.io/badge/testes-524%20passando-2EA44F)
+![Testes](https://img.shields.io/badge/testes-592%20passando-2EA44F)
 ![Cobertura](https://img.shields.io/badge/cobertura-100%25-2EA44F)
 
-[Plataforma](https://brightedtech.com.br) · [Repositório do front-end](https://github.com/joaopedro-albuquerque/bright-edtech-frontend) · [Referência da API](.context/api-reference.md)
+[Acessar a plataforma](https://brightedtech.com.br) · [Repositório do front-end](https://github.com/joaopedro-albuquerque/bright-edtech-frontend) · [Referência da API](.context/api-reference.md)
+
+<img src="docs/img/demo.gif" alt="Demonstração da plataforma: pastas, busca, revisão e estudo de flashcards" width="860">
 
 </div>
 
-> TCC do curso de **Análise e Desenvolvimento de Sistemas (IFSP)**, construído por um time de quatro estudantes.
-> O ambiente de produção é ligado sob demanda para economizar — se a plataforma estiver fora do ar no momento, ela volta em poucos minutos.
+## Índice
 
----
+- [Sobre](#sobre)
+- [O que a API oferece](#o-que-a-api-oferece)
+- [Como funciona](#como-funciona)
+- [Arquitetura](#arquitetura)
+- [Modelagem de dados](#modelagem-de-dados)
+- [Revisão espaçada](#revisão-espaçada)
+- [Endpoints](#endpoints)
+- [Segurança](#segurança)
+- [Tecnologias](#tecnologias)
+- [Qualidade](#qualidade)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Executando localmente](#executando-localmente)
+- [Documentação técnica](#documentação-técnica)
 
-## O problema
+## Sobre
 
-Estudar com PDF costuma ser leitura passiva: o aluno lê, acha que aprendeu e esquece em poucos dias. Grifar e reler não resolve, e organizar manualmente quando revisar cada assunto toma um tempo que ninguém tem sobrando.
+A Bright EdTech é uma plataforma para quem estuda a partir de documentos. O estudante envia um PDF e recebe resumos, flashcards e quizzes do próprio material, com as revisões agendadas por repetição espaçada.
 
-## A solução
+Este repositório contém o **back-end**: as rotas HTTP, as regras de negócio, a integração com IA e a infraestrutura como código. A interface está no [repositório do front-end](https://github.com/joaopedro-albuquerque/bright-edtech-frontend).
 
-A **Bright EdTech** funciona como um copiloto de estudos:
+## O que a API oferece
 
-1. o aluno envia um PDF;
-2. a IA transforma o conteúdo em **resumos** (3 formatos diferentes), **flashcards** e **quizzes**;
-3. um algoritmo de **repetição espaçada (SM-2)** decide *quando* cada item deve ser revisado — revisar pouco antes de esquecer fixa o conteúdo com muito menos esforço.
-
-Este repositório é o **back-end**: a API, as regras de negócio, a integração com IA e a infraestrutura que sustentam a plataforma.
-
-## Por que vale a pena olhar este projeto
-
-- 🧠 **IA com plano B** — Amazon Bedrock como principal e Google Gemini assume automaticamente se o primeiro falhar, sem o usuário perceber.
-- 🛡️ **Moderação de conteúdo** — todo upload passa por uma checagem de IA antes de ser aceito na plataforma.
-- 🔁 **Repetição espaçada de verdade** — algoritmo SM-2 implementado e coberto por testes dedicados, não um cronograma fixo.
-- 🔐 **Autenticação e isolamento de dados** — login via Amazon Cognito, com garantia de que um usuário nunca acessa dados de outro.
-- 🗑️ **Exclusão completa (LGPD)** — apagar a conta remove tudo, banco de dados e arquivos armazenados.
-- ☁️ **Infraestrutura como código** — toda a nuvem provisionada via CloudFormation, com deploy automatizado.
-- ✅ **Qualidade levada a sério** — 524 testes automatizados, 100% de cobertura de linhas e branches.
+| Recurso | Descrição |
+|---|---|
+| Documentos | Envio de PDFs com verificação de formato, tamanho e conteúdo; organização em pastas e subpastas; busca por nome; visualização do arquivo |
+| Resumos | Três formatos: Executivo, Cornell e Fichamento acadêmico, com download em PDF |
+| Flashcards e quizzes | Geração a partir do documento, com quantidade e dificuldade configuráveis |
+| Revisão espaçada | Agenda cada item pelo algoritmo SM-2 e lista o que está atrasado, agrupado por documento |
+| Perfil e conta | Cadastro, onboarding, aceite dos termos e exclusão completa da conta |
 
 ## Como funciona
 
 ```mermaid
 flowchart LR
-  U["Navegador<br/>(React SPA)"] -->|"HTTPS"| CF["CloudFront"]
-  U -->|"login"| CG["Amazon Cognito"]
-  U -->|"JWT"| API["API FastAPI<br/>(containers na AWS)"]
-  API --> DB[("PostgreSQL")]
-  API --> S3[("S3<br/>arquivos e artefatos")]
-  API --> IA["Bedrock / Gemini"]
+  A["Upload do PDF"] --> B["Verificação<br/>formato, tamanho e conteúdo"]
+  B --> C["Arquivo no S3<br/>registro no PostgreSQL"]
+  C --> D["Geração por IA<br/>resumo, flashcards ou quiz"]
+  D --> E["Conteúdo no S3<br/>estado de revisão no PostgreSQL"]
+  E --> F["Revisão espaçada"]
 ```
 
-O front-end é servido como site estático via CloudFront; a API roda em containers na AWS, autenticada via Cognito, com dados em PostgreSQL e arquivos no S3. Toda a infraestrutura é descrita como código e implantada por CI/CD — detalhes em [`.context/arquitetura.md`](.context/arquitetura.md).
+O banco de dados guarda os metadados e o estado de revisão de cada item. O conteúdo textual dos materiais gerados fica no S3 e é combinado com o estado de revisão na hora de responder, por meio de um identificador de item (`item_ref`).
 
-## O cérebro do produto: repetição espaçada
+## Arquitetura
 
-Cada flashcard e cada questão tem seu próprio calendário de revisão, baseado em três números: fator de facilidade, intervalo e sequência de acertos.
+O back-end é uma aplicação FastAPI executada em contêiner no Amazon ECS (Fargate), atrás de um Application Load Balancer. O front-end é estático, servido por CloudFront a partir de um bucket S3 privado.
 
 ```mermaid
 flowchart LR
-  A["Itens que vencem hoje<br/>(Revisão Geral)"] --> B["Aluno avalia:<br/>Errei · Difícil · Bom · Fácil"]
-  B --> C{"Acertou?"}
-  C -- "não" --> D["Volta para revisar amanhã"]
-  C -- "sim" --> E["1ª vez: 1 dia depois<br/>2ª vez: 6 dias depois<br/>daí em diante: intervalo cresce"]
+  U["Navegador<br/>SPA React"] -->|"HTTPS"| CF["CloudFront"]
+  CF --> FS[("S3 privado<br/>front-end")]
+  U -->|"login"| CG["Amazon Cognito"]
+  U -->|"JWT"| ALB["Application<br/>Load Balancer"]
+  ALB --> API["API FastAPI<br/>ECS Fargate"]
+  API --> DB[("PostgreSQL<br/>Amazon RDS")]
+  API --> DS[("S3<br/>documentos e conteúdo gerado")]
+  API --> IA["IA generativa"]
+  API --> SSM["Parameter Store<br/>credenciais"]
+```
+
+A aplicação segue uma arquitetura em camadas:
+
+```mermaid
+flowchart TB
+  M["Middlewares<br/>identificador de requisição, CORS e autenticação JWT"] --> R["Routers<br/>rotas REST por domínio"]
+  R --> S["Services<br/>regras de negócio, IA, SM-2 e geração de PDF"]
+  S --> P["Repositories<br/>acesso ao PostgreSQL"]
+  S --> X["Integrações<br/>S3 e IA generativa"]
+```
+
+A infraestrutura é descrita em CloudFormation (`cloudformation/`) e implantada por workflows manuais do GitHub Actions.
+
+## Modelagem de dados
+
+```mermaid
+erDiagram
+  USUARIOS ||--o{ PASTAS : possui
+  PASTAS ||--o{ PASTAS : "contém subpastas"
+  PASTAS ||--o{ DOCUMENTOS : agrupa
+  USUARIOS ||--o{ DOCUMENTOS : envia
+  DOCUMENTOS ||--o{ RESUMOS : gera
+  DOCUMENTOS ||--o{ FLASHCARDS : gera
+  DOCUMENTOS ||--o{ QUIZZES : gera
+  FLASHCARDS ||--o{ CARTOES : contém
+  QUIZZES ||--o{ QUESTOES : contém
+
+  USUARIOS {
+    uuid id PK
+    string email
+    string cognito_id
+    boolean tour_concluido
+    timestamp termos_aceitos_em
+  }
+  PASTAS {
+    uuid id PK
+    uuid usuario_id FK
+    uuid pasta_pai_id FK
+    string nome
+  }
+  DOCUMENTOS {
+    uuid id PK
+    uuid usuario_id FK
+    uuid pasta_id FK
+    string nome
+    string status
+  }
+  RESUMOS {
+    uuid id PK
+    uuid documento_id FK
+    string titulo
+    string modelo_ia
+  }
+  FLASHCARDS {
+    uuid id PK
+    uuid documento_id FK
+    string titulo
+  }
+  CARTOES {
+    uuid id PK
+    uuid flashcard_id FK
+    string item_ref
+    int intervalo_atual
+    int repeticoes
+    timestamp proxima_revisao
+  }
+  QUIZZES {
+    uuid id PK
+    uuid documento_id FK
+    string titulo
+  }
+  QUESTOES {
+    uuid id PK
+    uuid quiz_id FK
+    string item_ref
+    int intervalo_atual
+    int repeticoes
+    timestamp proxima_revisao
+  }
+```
+
+Todas as tabelas de conteúdo também referenciam `usuario_id`, o que permite filtrar cada consulta pelo dono do recurso. O esquema completo está em [`schema.sql`](schema.sql).
+
+## Revisão espaçada
+
+Cada cartão e cada questão guarda o fator de facilidade, o intervalo atual, o número de repetições e a data da próxima revisão. O algoritmo SM-2 recalcula esses valores a cada avaliação.
+
+```mermaid
+flowchart LR
+  A["Itens com revisão vencida"] --> B["Avaliação<br/>de 1 a 5"]
+  B --> C{"Lembrou?"}
+  C -- "sim" --> D["Intervalo cresce"]
+  C -- "não" --> E["Intervalo reinicia"]
   D --> F["Agenda a próxima revisão"]
   E --> F
   F --> A
 ```
 
-Exemplo prático: respondendo "Bom" sempre, o conteúdo reaparece em **1 dia → 6 dias → 15 dias → ~38 dias**. Errar reinicia o ciclo sem punir o aluno — ele só revisa de novo mais cedo.
+## Endpoints
 
----
+A documentação interativa (Swagger) fica em `/docs`. A referência completa, com exemplos, está em [`.context/api-reference.md`](.context/api-reference.md).
 
-## Stack
+| Grupo | Exemplos |
+|---|---|
+| Perfil | `POST /profile`, `GET /profile`, `PUT /profile/{id}`, `DELETE /profile/{id}` |
+| Pastas | `POST /pastas`, `GET /pastas/user/{id}`, `GET /pastas/{id}/conteudo` |
+| Documentos | `POST /documentos/upload`, `GET /documentos`, `GET /documentos/{id}/url-visualizacao` |
+| Resumos | `POST /documentos/{id}/resumos`, `GET /resumos/{id}/conteudo`, `GET /resumos/{id}/pdf` |
+| Flashcards | `POST /documentos/{id}/flashcards`, `GET /flashcards/{id}/conteudo` |
+| Quizzes | `POST /documentos/{id}/quizzes`, `GET /quizzes/{id}/conteudo` |
+| Revisões | `GET /revisoes/hoje`, `GET /revisoes/lotes`, `PUT /revisoes/cartoes/{id}/avaliar` |
+
+## Segurança
+
+- **Autenticação:** cadastro e login pelo Amazon Cognito; o token JWT é validado em todas as rotas.
+- **Isolamento por usuário:** toda consulta é filtrada pelo dono do recurso, e o identificador informado na requisição é conferido com o do token.
+- **Verificação do conteúdo enviado:** o arquivo é validado e analisado antes de ser aceito.
+- **Dados:** arquivos em bucket privado com criptografia, banco em sub-rede privada sem endereço público e credenciais no Parameter Store.
+- **Exclusão de conta:** remove os dados do banco e os arquivos armazenados.
+
+## Tecnologias
 
 | Área | Tecnologias |
 |---|---|
 | Linguagem e framework | Python 3.12, FastAPI, Pydantic v2 |
 | Banco de dados | PostgreSQL (Amazon RDS) |
-| IA | Amazon Bedrock (Claude) com *fallback* para Google Gemini |
+| IA generativa | Modelos de linguagem via serviço gerenciado |
 | Autenticação | Amazon Cognito |
 | Infraestrutura | ECS Fargate, RDS, S3, CloudFront, CloudFormation |
 | CI/CD | GitHub Actions |
 | Testes | pytest, pytest-cov, pytest-mock |
 
-## Testes e qualidade
+## Qualidade
 
-524 testes automatizados cobrindo regras de negócio, rotas e tratamento de erros, com **100% de cobertura de linhas e branches**. As dependências externas (banco, S3, IA) são simuladas, então a suíte roda sem precisar de nenhuma credencial:
+A suíte tem 592 testes automatizados, com 100% de cobertura de linhas e de ramos. As dependências externas (banco, S3 e IA) são simuladas, então os testes rodam sem credenciais.
 
 ```bash
 pip install -r requirements-dev.txt
 pytest
 ```
 
-## Rodando localmente
+## Estrutura do projeto
 
-**Pré-requisitos:** Python 3.12 e PostgreSQL com o [`schema.sql`](schema.sql) aplicado.
+```
+app/
+├── api/           # rotas HTTP e middlewares
+├── core/          # configuração, banco, autenticação e exceções
+├── services/      # regras de negócio, IA, S3, SM-2 e geração de PDF
+├── repositories/  # acesso ao PostgreSQL
+├── schemas/       # modelos de entrada e saída
+└── main.py
+cloudformation/    # infraestrutura como código
+tests/             # testes automatizados
+schema.sql         # esquema do banco
+.context/          # documentação técnica
+```
+
+## Executando localmente
+
+Requisitos: Python 3.12 e PostgreSQL com o [`schema.sql`](schema.sql) aplicado.
 
 ```bash
 python -m venv venv
 source venv/bin/activate            # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# crie um .env na raiz com as credenciais do banco, S3 e IA
+# crie um .env na raiz com as credenciais do banco, do S3 e da IA
 uvicorn app.main:app --reload --port 8000
 ```
 
-Abra `http://localhost:8000/docs` para a documentação interativa (Swagger).
+A documentação interativa fica em `http://localhost:8000/docs`.
 
-## Quer ir mais fundo?
-
-A documentação técnica completa — arquitetura, modelo de dados, referência da API e decisões de projeto — está em [`.context/`](.context):
+## Documentação técnica
 
 - [Visão geral do produto](.context/visao-geral.md)
 - [Arquitetura](.context/arquitetura.md)
 - [Modelo de dados](.context/dados.md)
 - [Referência da API](.context/api-reference.md)
-- [IA generativa: Bedrock e Gemini](.context/ia-generativa.md)
 
-## Estrutura do projeto
+---
 
-```
-app/
-├── api/           # rotas HTTP e middlewares
-├── core/          # config, banco, autenticação, exceções
-├── services/      # regras de negócio (IA, S3, SM-2, geração de PDF...)
-├── repositories/  # acesso ao PostgreSQL
-├── schemas/       # modelos de entrada e saída
-└── main.py
-cloudformation/    # infraestrutura como código
-tests/             # suíte de testes automatizados
-schema.sql         # esquema do banco
-.context/          # documentação técnica detalhada
-```
-
-## Time
-
-Projeto desenvolvido por **Eric, João, Miguel e Gabriela**, estudantes de Análise e Desenvolvimento de Sistemas no IFSP.
-
-> ⚠️ Conteúdos gerados por inteligência artificial podem conter imprecisões. Confira sempre com o material original antes de usá-los como única fonte de estudo.
+<sub>Projeto acadêmico do curso de Análise e Desenvolvimento de Sistemas do Instituto Federal de São Paulo (IFSP). Conteúdos gerados por inteligência artificial podem conter imprecisões e devem ser conferidos com o material original.</sub>
